@@ -1,2 +1,5 @@
-import { defineConfig } from 'vite';
-export default defineConfig({ build: { outDir: 'dist', sourcemap: true }, esbuild: { jsx: 'automatic' } });
+import { defineConfig } from "vite";
+export default defineConfig({
+  build: { outDir: "dist", sourcemap: true },
+  esbuild: { jsx: "automatic" },
+});

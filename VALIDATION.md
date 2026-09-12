@@ -1,0 +1,19 @@
+# Validation record — September 12, 2026
+
+## Passed
+
+- Production UI build: Vite, 19 transformed modules; no build errors.
+- 16 backend/unit/integration tests: stream framing and split UTF-8; model/endpoint validation; live-page parser fixtures; project traversal/symlink/secret protections; stale-write checks; atomic persistence and interrupted-work recovery; corrupt-store protection; command output/exit/timeout; token and Host/Origin checks; streaming task queue/cancellation; approve/reject/stop behavior; real file writes after approval; command approval; download pause/resume/errors; atomic invalid settings.
+- 12 Playwright browser workflows: initial workspace; model search and variant download; installed/update status; cancel deletion; add project; streaming coding task with diff review and file application; terminal output; file browser; archive/restore; settings/theme; reload persistence; 1000-pixel desktop layout without overflow. No browser page errors.
+- Native Electron smoke: workspace and model library render; the folder-picker bridge is present; window.require is unavailable. A **test-only --no-sandbox override** was required by the restricted host. Production launchers and package retain sandboxing.
+- Live Ollama 0.31.2: discovered existing local and cloud entries, fetched 240 model families and 62 local qwen3.5 variants, verified the installed qwen3.5:0.8b registry fingerprint, streamed EMBER_READY, invoked read_file in a temporary project and correctly answered with its verification word, and completed a real pull of the already-current model.
+- Visual inspection: 1440×1000 dark workspace/model library, modal details, settings, and narrower desktop layout. Screenshots use actual local model inventory; controlled UI tests use isolated fixtures.
+
+## Not verified on this host
+
+- Installing the Debian package system-wide: requires administrator access to configure Electron's sandbox helper. Package contents and modes are inspected, but a normal installed launch remains to be checked after installation.
+- Fresh Ollama installation: implementation was not executed because this machine already has Ollama. It supports an app-owned Linux x64/ARM64 runtime download; optional ROCm packages and OS GPU drivers are not installed.
+- macOS/Windows packaging, signing, and native dialogs on those platforms.
+- Large-model memory behavior, image/PDF ingestion, long-running interactive terminals, and Git worktree isolation.
+
+The running preview's workspace data is separate from test fixtures. Test projects and their files are removed after tests. Existing Ollama model weights were reused; no extra large model was downloaded for testing.

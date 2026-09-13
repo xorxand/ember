@@ -3123,3 +3123,9 @@ button {
 .panel-tabs {
   gap: 11px;
 }
+
+.approval-policy-help {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}

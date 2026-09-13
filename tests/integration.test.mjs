@@ -327,3 +327,174 @@ test("stopping a pending approval cannot execute the proposal and permits anothe
   });
   await until(() => app.store.task(task.id).status === "complete");
 });
+
+test("approval modes auto-run permitted actions and retain the audit trail", async (t) => {
+  const { app, call, projectPath } = await fixture(t);
+  const project = (
+    await call("projects", {
+      path: projectPath,
+      approvalPolicy: {
+        mode: "risky",
+        trustedCommands: ["printf agent-command-ok"],
+      },
+    })
+  ).data;
+  const write = (await call("tasks", { projectId: project.id, mode: "agent" }))
+    .data;
+  await call("tasks/send", { id: write.id, content: "write a file" });
+  await until(() => app.store.task(write.id).status === "complete");
+  const stored = app.store.task(write.id);
+  assert.equal(
+    await fs.readFile(path.join(projectPath, "hello.txt"), "utf8"),
+    "Hello from the agent.\n",
+  );
+  assert.equal(stored.approvals[0].approvalSource, "automatic");
+  assert.equal(stored.approvals[0].status, "applied");
+  assert.equal(
+    stored.messages.find((m) => m.role === "tool").approval.source,
+    "automatic",
+  );
+  const command = (
+    await call("tasks", { projectId: project.id, mode: "agent" })
+  ).data;
+  await call("tasks/send", { id: command.id, content: "command please" });
+  await until(() => app.store.task(command.id).status === "complete");
+  assert.equal(app.store.task(command.id).approvals[0].exitCode, 0);
+  assert.equal(
+    app.store.task(command.id).approvals[0].approvalSource,
+    "automatic",
+  );
+  const always = (
+    await call("tasks", {
+      projectId: project.id,
+      mode: "agent",
+      approvalPolicy: { mode: "always" },
+    })
+  ).data;
+  await call("tasks/send", { id: always.id, content: "command please" });
+  await until(() => app.store.task(always.id).status === "complete");
+  assert.equal(app.store.task(always.id).approvals[0].policyMode, "always");
+});
+test("untrusted and executable actions prompt; running policy changes cannot approve pending work", async (t) => {
+  const { app, call, projectPath } = await fixture(t);
+  const project = (
+    await call("projects", {
+      path: projectPath,
+      approvalPolicy: { mode: "risky" },
+    })
+  ).data;
+  const task = (await call("tasks", { projectId: project.id, mode: "agent" }))
+    .data;
+  await call("tasks/send", { id: task.id, content: "command please" });
+  const stored = app.store.task(task.id);
+  await until(() => stored.status === "approval");
+  assert.equal(stored.approvals[0].approvalSource, "user");
+  assert.match(stored.approvals[0].reason, /not trusted/);
+  assert.equal(
+    (
+      await call("tasks/update", {
+        id: task.id,
+        approvalPolicy: { mode: "always" },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await call("projects/update", {
+        id: project.id,
+        approvalPolicy: { mode: "always" },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(stored.approvals[0].status, "pending");
+  await call("approvals", { id: stored.approvals[0].id, approve: false });
+  await until(() => stored.status === "complete");
+  assert.equal(stored.approvals[0].status, "rejected");
+  await fs.writeFile(path.join(projectPath, "hello.txt"), "original", {
+    mode: 0o755,
+  });
+  const executable = (
+    await call("tasks", { projectId: project.id, mode: "agent" })
+  ).data;
+  await call("tasks/send", { id: executable.id, content: "write a file" });
+  await until(() => app.store.task(executable.id).status === "approval");
+  assert.equal(
+    await fs.readFile(path.join(projectPath, "hello.txt"), "utf8"),
+    "original",
+  );
+  await call("tasks/stop", { id: executable.id });
+  await until(() => app.store.task(executable.id).status === "stopped");
+});
+test("approval updates validate atomically, task overrides beat project defaults, and reset inherits", async (t) => {
+  const { app, call, projectPath } = await fixture(t);
+  const project = (await call("projects", { path: projectPath })).data;
+  const task = (await call("tasks", { projectId: project.id, mode: "agent" }))
+    .data;
+  assert.equal(
+    (
+      await call("projects/update", {
+        id: project.id,
+        name: "wrong",
+        approvalPolicy: { mode: "invalid" },
+      })
+    ).status,
+    400,
+  );
+  assert.notEqual(app.store.project(project.id).name, "wrong");
+  assert.equal(
+    (
+      await call("tasks/update", {
+        id: task.id,
+        title: "wrong",
+        approvalPolicy: { mode: "always", trustedCommands: "bad" },
+      })
+    ).status,
+    400,
+  );
+  assert.notEqual(app.store.task(task.id).title, "wrong");
+  assert.equal(
+    (
+      await call("tasks/update", {
+        id: task.id,
+        model: "../bad",
+        approvalPolicy: { mode: "always" },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(app.store.task(task.id).approvalPolicy, null);
+  await call("projects/update", {
+    id: project.id,
+    approvalPolicy: { mode: "always" },
+  });
+  await call("tasks/update", { id: task.id, approvalPolicy: { mode: "ask" } });
+  await call("tasks/send", { id: task.id, content: "write a file" });
+  await until(() => app.store.task(task.id).status === "approval");
+  await call("tasks/stop", { id: task.id });
+  await until(() => app.store.task(task.id).status === "stopped");
+  await call("tasks/update", { id: task.id, approvalPolicy: null });
+  assert.equal(app.store.task(task.id).approvalPolicy, null);
+  assert.equal(app.store.project(project.id).approvalPolicy.mode, "always");
+});
+
+test("Always run still supports cancellation of an executing automatic command", async (t) => {
+  const { app, call, projectPath } = await fixture(t);
+  const project = (await call("projects", { path: projectPath })).data;
+  const task = (
+    await call("tasks", {
+      projectId: project.id,
+      mode: "agent",
+      approvalPolicy: { mode: "always" },
+    })
+  ).data;
+  await call("tasks/send", { id: task.id, content: "slow-command" });
+  const stored = app.store.task(task.id);
+  await until(() => stored.approvals[0]?.status === "executing");
+  assert.equal(stored.approvals[0].approvalSource, "automatic");
+  await call("tasks/stop", { id: task.id });
+  await until(() => stored.status === "stopped");
+  assert.equal(stored.approvals[0].status, "cancelled");
+  assert.equal(stored.agentActivity.commandsSucceeded, 0);
+});

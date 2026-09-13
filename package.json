@@ -1,7 +1,7 @@
 {
   "name": "ember-local",
   "productName": "Ember",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "A local AI workspace powered by Ollama",
   "type": "module",
@@ -17,7 +17,8 @@
     "package:linux": "npm run build && node scripts/package.mjs",
     "format": "prettier --write src server shared electron scripts tests index.html vite.config.js package.json README.md VALIDATION.md",
     "test:scaling-ui": "node tests/scaling-ui.mjs",
-    "test:agent-setup-ui": "node tests/agent-setup-ui.mjs"
+    "test:agent-setup-ui": "node tests/agent-setup-ui.mjs",
+    "test:approval-ui": "node tests/approval-policy-ui.mjs"
   },
   "dependencies": {
     "dompurify": "3.4.12",

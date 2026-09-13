@@ -87,7 +87,21 @@ export async function readFile(root, relative) {
 export async function inspectWrite(root, relative, content) {
   if (typeof content !== "string" || Buffer.byteLength(content) > 250_000)
     throw new Error("File changes are limited to 250 KB.");
-  await safePath(root, relative, { write: true });
+  const target = await safePath(root, relative, { write: true });
+  const canonical = await fs.realpath(root);
+  const normalized = path.relative(canonical, target);
+  let requiresReview = false;
+  let cursor = canonical;
+  for (const part of normalized.split(path.sep)) {
+    cursor = path.join(cursor, part);
+    try {
+      const stat = await fs.lstat(cursor);
+      if (stat.isSymbolicLink() || (stat.isFile() && stat.mode & 0o111))
+        requiresReview = true;
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+    }
+  }
   let before = null;
   try {
     before = await readFile(root, relative);
@@ -95,7 +109,8 @@ export async function inspectWrite(root, relative, content) {
     if (e.code !== "ENOENT") throw e;
   }
   return {
-    path: relative,
+    path: normalized,
+    requiresReview,
     content,
     before,
     beforeHash: before === null ? null : hash(before),

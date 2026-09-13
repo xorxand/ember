@@ -52,3 +52,11 @@ Native Electron smoke also passed under Xvfb (virtual display), using the existi
 - Added deterministic recovery tests: a prose-only answer followed by actual approved writes; a missing command recovered after a write; and bounded no-tool replies explicitly labeled as response-only.
 - Live Ollama `qwen3.5:4b` executed the exact countdown request in a temporary project: approved source-file creation, approved `go build -o count_down count_down.go && ./count_down`, exit code 0, and output 10 through 1. The resulting executable was independently rerun and produced the same output. The user’s project was not modified.
 - A live `qwen2.5:1.5b` run called a build command before creating source, then failed to recover. Tool capability metadata alone does not establish model reliability.
+
+## Version 1.1.0 — approval policies
+
+- All 31 backend/unit/integration tests passed. Added policy inheritance and exact matching, invalid input and atomic updates, ordinary versus protected file classification, SQLite restart persistence, automatic write/command execution and audit, pending/running policy-change guards, task override reset, rejection, and cancellation of an automatically executing command.
+- New approval browser workflow passed: project policy creation/editing, task overrides, inheritance reset, automatic actions, visible audit labels, manual rejection, active-task controls, reload persistence, and cancelling a settings edit.
+- Existing browser workflows (12 standard checks, scaling, and Agent setup) passed.
+- Inspected the approval dialog at 1440×1000. Shell execution retains user-level access; this feature does not add OS sandboxing.
+- Native Electron smoke passed under Xvfb with the existing test-only sandbox override. The Debian package’s version, shared policy module, launcher, and root-owned sandbox helper were verified; normal package installation remains untested on this host.

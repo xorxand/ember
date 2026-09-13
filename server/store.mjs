@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { normalizeApprovalPolicy } from "../shared/approval-policy.js";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
@@ -282,10 +283,18 @@ export class Store extends EventEmitter {
     if (!p) throw new Error("Project not found");
     return p;
   }
-  addTask({ projectId = null, title = "New task", model, mode = "chat" } = {}) {
+  addTask({
+    projectId = null,
+    title = "New task",
+    model,
+    mode = "chat",
+    approvalPolicy = null,
+  } = {}) {
     const project = projectId ? this.project(projectId) : null;
+    const policy = normalizeApprovalPolicy(approvalPolicy, { inherit: true });
     const t = this.wrapTask({
       id: id(),
+      approvalPolicy: policy,
       projectId,
       title: String(title).slice(0, 120),
       model: model || project?.model || this.data.settings.defaultModel,

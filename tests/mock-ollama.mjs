@@ -125,7 +125,11 @@ export async function mockOllama() {
         const name = user.includes("command") ? "run_command" : "write_file";
         const args =
           name === "run_command"
-            ? { command: "printf agent-command-ok" }
+            ? {
+                command: user.includes("slow-command")
+                  ? "sleep 10"
+                  : "printf agent-command-ok",
+              }
             : {
                 path: user.includes("escape") ? "../escape.txt" : "hello.txt",
                 content: "Hello from the agent.\n",

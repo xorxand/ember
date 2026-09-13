@@ -1,4 +1,5 @@
 import http from "node:http";
+import { normalizeApprovalPolicy } from "../shared/approval-policy.js";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
@@ -402,8 +403,12 @@ export async function createApp({
           const projectPath = await rootPath(data.path);
           if (store.data.projects.some((p) => p.path === projectPath))
             throw new Error("This folder is already a project.");
+          const approvalPolicy = normalizeApprovalPolicy(
+            data.approvalPolicy ?? { mode: "ask" },
+          );
           const project = {
             id: id(),
+            approvalPolicy,
             name: String(data.name || path.basename(projectPath)).slice(0, 100),
             path: projectPath,
             instructions: String(data.instructions || "").slice(0, 20000),
@@ -422,13 +427,23 @@ export async function createApp({
             )
           )
             throw new Error(
-              "Finish active project tasks before changing instructions.",
+              "Finish active project tasks before changing project settings.",
             );
+          const approvalPolicy =
+            data.approvalPolicy === undefined
+              ? undefined
+              : normalizeApprovalPolicy(data.approvalPolicy);
+          const nextModel =
+            data.model === undefined
+              ? undefined
+              : data.model
+                ? modelName(data.model)
+                : "";
+          if (approvalPolicy !== undefined) p.approvalPolicy = approvalPolicy;
           if (data.name) p.name = String(data.name).slice(0, 100);
           if (data.instructions !== undefined)
             p.instructions = String(data.instructions).slice(0, 20000);
-          if (data.model !== undefined)
-            p.model = data.model ? modelName(data.model) : "";
+          if (nextModel !== undefined) p.model = nextModel;
           store.touch();
           return json(res, p);
         }
@@ -450,6 +465,7 @@ export async function createApp({
             (t) => t.projectId === data.id,
           )) {
             t.projectId = null;
+            t.approvalPolicy = null;
             t.mode = "chat";
           }
           store.touch();
@@ -491,13 +507,31 @@ export async function createApp({
           const t = store.task(data.id);
           if (
             activeStatuses.includes(t.status) &&
-            (data.model !== undefined || data.mode !== undefined)
+            (data.model !== undefined ||
+              data.mode !== undefined ||
+              data.approvalPolicy !== undefined)
           )
             throw new Error(
-              "Stop this task before changing its model or mode.",
+              "Stop this task before changing its model, mode, or approvals.",
             );
+          const approvalPolicy =
+            data.approvalPolicy === undefined
+              ? undefined
+              : normalizeApprovalPolicy(data.approvalPolicy, { inherit: true });
+          if (data.approvalPolicy !== undefined && t.archived)
+            throw new Error("Restore this task before changing approvals.");
+          const nextModel =
+            data.model === undefined ? undefined : modelName(data.model);
+          if (data.mode === "agent" && !t.projectId)
+            throw new Error("Agent mode requires a project.");
+          if (
+            typeof data.archived === "boolean" &&
+            activeStatuses.includes(t.status)
+          )
+            throw new Error("Stop the task before archiving it.");
+          if (approvalPolicy !== undefined) t.approvalPolicy = approvalPolicy;
           if (data.title) t.title = String(data.title).slice(0, 120);
-          if (data.model !== undefined) t.model = modelName(data.model);
+          if (nextModel !== undefined) t.model = nextModel;
           if (["agent", "chat"].includes(data.mode)) {
             if (data.mode === "agent" && !t.projectId)
               throw new Error("Agent mode requires a project.");

@@ -1,26 +1,25 @@
-# Ember 1.0.1
+# Ember 1.1.0
 
-Agent mode is now visible in every conversation, and the agent checks its tool results before treating a prose reply as its final answer. Previously, tasks without a project showed only Chat, and models could give instructions for work without actually doing it.
+Choose how Agent tasks handle approvals, with project defaults and per-task overrides.
 
-- Select Agent or click Enable Agent, then choose an existing project or add a local folder.
-- Keep the same conversation and unsent draft when enabling Agent. Previous requests are not replayed.
-- Agent checks for unfinished work with at most two automatic follow-ups per turn. It never executes code copied from a prose response.
-- Final Agent responses show actual tool calls, applied file approvals, and successful commands. Responses with no tool calls explicitly say that nothing ran.
-- Chat mode explicitly explains that it cannot edit files or run commands.
-- Active and archived tasks cannot change their execution scope; existing project history cannot be reassigned to another folder.
+- **Ask every time:** approve each file write and shell command. This remains the default for existing projects.
+- **Ask for risky or unknown:** automatically allow ordinary source/text edits and commands you explicitly trust by their full text. Scripts, configuration, executable/symlinked targets, unknown file types, and clearing nonempty files prompt for review. Unlisted commands always prompt.
+- **Always run:** execute agent writes and commands without per-action prompts. Shell commands run with your user permissions; they are not OS-sandboxed.
 
-Live verification: `qwen3.5:4b` created, compiled, and ran the requested Go countdown through approved commands, producing 10 through 1. `qwen2.5:1.5b` did not complete the same test reliably; use a stronger tool-capable model if the execution summary shows no useful work.
+Click **Approvals** below an Agent task’s message box. Set project defaults in **Project settings → Approval mode**. Task settings can inherit the project policy or override it.
+
+Automatic actions remain visible in history. Cancellation, timeouts, file-tool boundaries, and stale-write checks remain enabled. Settings cannot change during active work, and pending approvals are not retroactively approved.
 
 ## Install
 
-Download `ember-local_1.0.1_amd64.deb`, close Ember, and run:
+Close Ember, then install the downloaded package:
 
 ```sh
-sudo apt install ./ember-local_1.0.1_amd64.deb
+sudo apt install ./ember-local_1.1.0_amd64.deb
 ```
 
-Reopen Ember. Existing workspace data is retained. No model weights are bundled.
+Reopen Ember. Existing conversations, models, and projects are retained. Existing projects keep Ask every time until you change their policy.
 
-Alternatively, extract `ember-1.0.1.tar.gz`, enter `localmodel`, and run `node server/index.mjs` with Node.js 24 or newer. The release asset includes the built UI; GitHub automatic source archives need `npm ci && npm run build` first.
+The `ember-1.1.0.tar.gz` asset includes the built browser interface. Extract it, enter `localmodel`, and run `node server/index.mjs` using Node.js 24 or newer. GitHub automatic source archives need `npm ci && npm run build` first. Both downloadable assets have hashes in `SHA256SUMS`.
 
-Both assets have hashes in `SHA256SUMS`. System-wide installation is not verified on this host; see VALIDATION.md for the test record.
+See README.md for exact policy rules and VALIDATION.md for test evidence. System-wide Debian installation is not verified on this host.

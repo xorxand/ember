@@ -5,6 +5,10 @@ import DOMPurify from "dompurify";
 import Icon, { Logo } from "./icons";
 import { api, subscribe, bytes, cloud, busy, relativeTime } from "./api";
 import "./styles.css";
+import {
+  approvalModes,
+  effectiveApprovalPolicy,
+} from "../shared/approval-policy.js";
 marked.setOptions({ breaks: true, gfm: true });
 function Markdown({ children }) {
   const html = useMemo(
@@ -146,6 +150,157 @@ function ModelSelect({
         </option>
       ))}
     </select>
+  );
+}
+const policyInput = (mode, commands) =>
+  mode === "inherit"
+    ? null
+    : {
+        mode,
+        trustedCommands: commands
+          .split("\n")
+          .map((c) => c.trim())
+          .filter(Boolean),
+      };
+function ApprovalFields({
+  mode,
+  setMode,
+  commands,
+  setCommands,
+  inherited,
+  disabled,
+}) {
+  return (
+    <>
+      <label>
+        Approval mode
+        <select
+          aria-label="Approval mode"
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
+          disabled={disabled}
+        >
+          {inherited && (
+            <option value="inherit">
+              Use project default ({approvalModes[inherited.mode]})
+            </option>
+          )}
+          {Object.entries(approvalModes).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {mode === "ask" && (
+        <p className="approval-policy-help">
+          Read tools run automatically. Every file write and shell command
+          pauses for your approval.
+        </p>
+      )}
+      {mode === "risky" && (
+        <>
+          <p className="approval-policy-help">
+            Ordinary source/text edits run automatically. Scripts,
+            configuration, executable or symlinked files, and unknown file types
+            require review. Commands run automatically only when their complete
+            text matches a trusted entry.
+          </p>
+          <label>
+            Trusted commands
+            <textarea
+              aria-label="Trusted commands"
+              value={commands}
+              onChange={(e) => setCommands(e.target.value)}
+              rows={4}
+              disabled={disabled}
+              placeholder={"go build -o countdown main.go\ngo test ./..."}
+            />
+          </label>
+          <p className="approval-policy-help">
+            One exact command per line, up to 40. No prefix or wildcard
+            matching. Trust applies to the entire shell command, including any
+            operators you enter. Builds and tests can execute project code;
+            trust these only for projects you control.
+          </p>
+        </>
+      )}
+      {(mode === "always" ||
+        (mode === "inherit" && inherited?.mode === "always")) && (
+        <p className="inline-error">
+          Always run executes agent writes and commands without approval
+          prompts. Shell commands run with your user permissions and can access
+          files outside this project.
+        </p>
+      )}
+      {mode === "inherit" && inherited?.mode !== "always" && (
+        <p className="approval-policy-help">
+          This task follows its project’s approval mode and exact
+          trusted-command list.
+        </p>
+      )}
+      <p className="approval-policy-help">
+        Actions are recorded in task history. Stop remains available. File-tool
+        boundaries and stale-write checks stay enabled in every mode.
+      </p>
+    </>
+  );
+}
+function TaskApprovalsModal({ task, project, perform, onClose }) {
+  const [mode, setMode] = useState(task.approvalPolicy?.mode || "inherit");
+  const [commands, setCommands] = useState(
+    (
+      task.approvalPolicy?.trustedCommands ||
+      project?.approvalPolicy?.trustedCommands ||
+      []
+    ).join("\n"),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <Modal title="Task approvals" onClose={onClose}>
+      <form
+        className="modal-body form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setSaving(true);
+          setError("");
+          try {
+            await perform("tasks/update", {
+              id: task.id,
+              approvalPolicy: policyInput(mode, commands),
+            });
+            onClose();
+          } catch (e) {
+            setError(e.message);
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <p>
+          Choose how this task handles file writes and shell commands. Project
+          defaults are available in project settings.
+        </p>
+        <ApprovalFields
+          mode={mode}
+          setMode={setMode}
+          commands={commands}
+          setCommands={setCommands}
+          inherited={effectiveApprovalPolicy(null, project)}
+          disabled={saving}
+        />
+        {error && <p className="inline-error">{error}</p>}
+        <div className="dialog-actions">
+          <Button type="button" disabled={saving} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" className="primary" disabled={saving}>
+            {saving ? "Saving…" : "Save approvals"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 function App() {
@@ -463,7 +618,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v1.0.1</span>
+            <span>v1.1.0</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -1762,6 +1917,12 @@ function ProjectModal({ project, state, onClose, perform, onCreated }) {
     [folder, setFolder] = useState(project?.path || ""),
     [instructions, setInstructions] = useState(project?.instructions || ""),
     [model, setModel] = useState(project?.model || ""),
+    [approvalMode, setApprovalMode] = useState(
+      project?.approvalPolicy?.mode || "ask",
+    ),
+    [trustedCommands, setTrustedCommands] = useState(
+      (project?.approvalPolicy?.trustedCommands || []).join("\n"),
+    ),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   return (
@@ -1779,8 +1940,19 @@ function ProjectModal({ project, state, onClose, perform, onCreated }) {
             const p = await perform(
               project ? "projects/update" : "projects",
               project
-                ? { id: project.id, name, instructions, model }
-                : { name, path: folder, instructions },
+                ? {
+                    id: project.id,
+                    name,
+                    instructions,
+                    model,
+                    approvalPolicy: policyInput(approvalMode, trustedCommands),
+                  }
+                : {
+                    name,
+                    path: folder,
+                    instructions,
+                    approvalPolicy: policyInput(approvalMode, trustedCommands),
+                  },
             );
             onCreated(p);
             onClose();
@@ -1850,11 +2022,13 @@ function ProjectModal({ project, state, onClose, perform, onCreated }) {
             />
           </label>
         )}
-        <p className="small muted">
-          Agent reads stay inside this folder. Proposed writes and shell
-          commands require your review. Commands run with your user’s
-          permissions.
-        </p>
+        <ApprovalFields
+          mode={approvalMode}
+          setMode={setApprovalMode}
+          commands={trustedCommands}
+          setCommands={setTrustedCommands}
+          disabled={saving}
+        />
         {error && <p className="inline-error">{error}</p>}
         <div className="dialog-actions">
           {project ? (
@@ -1958,8 +2132,8 @@ function EnableAgentModal({ task, state, perform, onClose }) {
         </Button>
         <p className="small muted">
           Agent can read files and propose edits and commands, including builds.
-          You review writes and commands before they run. Choose a model with
-          tool support.
+          Writes and commands follow the project or task approval policy. Choose
+          a model with tool support.
         </p>
         {error && <p className="inline-error">{error}</p>}
         <div className="dialog-actions">
@@ -2299,7 +2473,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Version 1.0.1</Tag>
+            <Tag>Version 1.1.0</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -2339,6 +2513,8 @@ function TaskView({
     [olderMore, setOlderMore] = useState(true),
     [loadingOlder, setLoadingOlder] = useState(false);
   const [enablingAgent, setEnablingAgent] = useState(false);
+  const [editingApprovals, setEditingApprovals] = useState(false);
+  const approvalPolicy = effectiveApprovalPolicy(task, project);
   const changeMode = (mode) => {
     if (mode === "agent" && !project) setEnablingAgent(true);
     else act("tasks/update", { id: task.id, mode });
@@ -2515,9 +2691,20 @@ function TaskView({
                   {m.tool_name?.replaceAll("_", " ")}
                   <span>
                     {m.content.startsWith("Error:") ? "Error" : "Result"}
+                    {m.approval?.source === "automatic"
+                      ? " · Auto-approved"
+                      : ""}
                   </span>
                   <Icon name="down" size={13} />
                 </summary>
+                {m.approval && (
+                  <p className="small muted">
+                    {m.approval.source === "automatic"
+                      ? "Automatically approved"
+                      : "Reviewed by you"}
+                    : {m.approval.reason}
+                  </p>
+                )}
                 <pre>{m.content}</pre>
               </details>
             ) : (
@@ -2798,9 +2985,18 @@ function TaskView({
             <span
               className={`status-dot ${state.ollama.connected ? "online" : ""}`}
             />
-            {task.mode === "agent"
-              ? "File changes & commands require review"
-              : "Chat only · no file edits or commands"}
+            {task.mode === "agent" ? (
+              <button
+                type="button"
+                aria-label="Task approvals"
+                disabled={active || task.archived || offline}
+                onClick={() => setEditingApprovals(true)}
+              >
+                Approvals: {approvalModes[approvalPolicy.mode]}
+              </button>
+            ) : (
+              "Chat only · no file edits or commands"
+            )}
           </span>
           {task.mode === "chat" && (
             <button
@@ -2818,6 +3014,14 @@ function TaskView({
           )}
         </div>
       </div>
+      {editingApprovals && (
+        <TaskApprovalsModal
+          task={task}
+          project={project}
+          perform={perform}
+          onClose={() => setEditingApprovals(false)}
+        />
+      )}
       {enablingAgent && (
         <EnableAgentModal
           task={task}
@@ -2840,6 +3044,7 @@ function Approval({ approval: a, act, onInspect }) {
         </strong>
         <Tag>Approval needed</Tag>
       </div>
+      {a.reason && <p className="small muted">{a.reason}</p>}
       <code>{a.kind === "write" ? a.path : a.command}</code>
       {a.kind === "write" ? (
         <p>

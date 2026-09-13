@@ -6,7 +6,7 @@ A Codex-inspired local AI workspace powered by Ollama. Projects and multiple tas
 
 ### Browser workspace — quickest start
 
-Requires **Node.js 24 or newer**. The `ember-1.0.1.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
+Requires **Node.js 24 or newer**. The `ember-1.1.0.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
 
 ```bash
 cd localmodel
@@ -19,10 +19,10 @@ Cloning the repository instead? Run `npm ci` and `npm run build` before starting
 
 ### Linux desktop package
 
-Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/localmodel/releases/tag/1.0.1). Local builds place it in `release/ember-local_1.0.1_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/localmodel/releases/tag/1.1.0). Local builds place it in `release/ember-local_1.1.0_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_1.0.1_amd64.deb
+sudo apt install ./release/ember-local_1.1.0_amd64.deb
 ember
 ```
 
@@ -41,7 +41,7 @@ npm run desktop
 
 - **Projects and tasks:** connect real folders, persistent conversation history, task rename, archive/restore, search, per-project instructions and model defaults. Each task independently selects Chat or Agent mode and an installed model.
 - **Streaming chat:** native Ollama streaming, Markdown rendering, code blocks, copy response, text attachments, output token/speed metrics, cancellation, and context-budget handling.
-- **Coding agent:** fast literal code search, file-name search, declaration lookup, bounded line excerpts, list/read project files, propose complete file changes, inspect a before/after diff, approve or reject each write and command, capture terminal output, and continue the agent loop with tool results. Up to 12 model steps per turn.
+- **Coding agent:** fast literal code search, file-name search, declaration lookup, bounded line excerpts, list/read project files, propose complete file changes, inspect a before/after diff, control automatic versus reviewed writes and commands, capture terminal output, and continue the agent loop with tool results. Up to 12 model steps per turn.
 - **Model discovery:** a live, searchable Ollama library with capabilities, parameter variants, size and context metadata. Popularity/name/recent-update sorting, cached catalog, model-card/license links, and manual pulls by exact model name.
 - **Installed model management:** local/cloud distinction, default selection, license/details inspection, unload from memory, remove with confirmation, and registry fingerprint checks for updates. Updates never silently replace models in queued or active tasks.
 - **Downloads:** streaming layer progress, one-at-a-time queue, pause/resume using Ollama's cached layers, errors/retry, completed history, and refresh of installed models after completion. Download state survives app restarts.
@@ -50,7 +50,19 @@ npm run desktop
 
 ## Chat and Agent mode
 
-Use **Chat** for conversation. It cannot edit files or execute commands. Choose **Agent** in the composer (or **Enable Agent** below it) to do work. If the task has no project, select an existing project or add a local folder. Your messages and draft stay in the same task; send the next instruction to begin, since old requests are not replayed. Agent requires a model with tool support and asks you to approve writes and commands. It checks for unfinished work with at most two automatic follow-ups per turn. Final replies show actual tool activity; no-tool responses explicitly say that no files or commands were affected. Advertised tool support does not guarantee reliable execution. Commands can also create or modify files, so the separate file-approval count only covers direct file-tool changes.
+Use **Chat** for conversation. It cannot edit files or execute commands. Choose **Agent** in the composer (or **Enable Agent** below it) to do work. If the task has no project, select an existing project or add a local folder. Your messages and draft stay in the same task; send the next instruction to begin, since old requests are not replayed. Agent requires a model with tool support and uses the configured approval policy for writes and commands (Ask every time by default). It checks for unfinished work with at most two automatic follow-ups per turn. Final replies show actual tool activity; no-tool responses explicitly say that no files or commands were affected. Advertised tool support does not guarantee reliable execution. Commands can also create or modify files, so the separate file-approval count only covers direct file-tool changes.
+
+## Approval policies
+
+In an Agent task, click **Approvals** below the message box. Choose a task override or **Use project default**. Set the project default from its overview → **Project settings** → **Approval mode**. Existing projects default to **Ask every time** until you change them.
+
+- **Ask every time:** read tools run automatically; each write and shell command requires approval.
+- **Ask for risky or unknown:** ordinary source/text edits run automatically. Shell commands require approval unless their entire text matches an explicitly trusted command (leading/trailing whitespace is ignored). Configure up to 40 exact commands, one per line. Entries have no prefix or wildcard matching; if you explicitly trust a compound shell command, the entire command is authorized. Builds/tests execute current project code and can have effects beyond the project folder.
+- **Always run:** agent writes and commands run without per-action approval. Commands have your user permissions and are not OS-sandboxed. Stop, timeouts, tool path boundaries, and stale-write checks remain active.
+
+The middle mode permits common source/text extensions; scripts/configuration directories, dotfiles, known build/configuration files, shebang scripts, executable or symlinked targets, unknown types, and clearing an existing nonempty file require review. These are conservative rules, not a claim that source edits or trusted commands are harmless. An empty trusted list means every command prompts.
+
+Settings persist locally and cannot change during an active task. Pending approvals are never silently converted by changing a policy. Automatic actions are labeled **Auto-approved** in tool results, with the policy decision recorded in history. Policies affect agent tools; manually entered terminal commands and **Apply to original project** remain explicit user actions.
 
 ## Local data and privacy
 
@@ -77,6 +89,7 @@ File tools enforce the real project root, including symlink checks; parent trave
 ```bash
 npm test               # backend/unit/integration suite using an isolated mock Ollama
 npm run test:ui        # existing Playwright workflows
+npm run test:approval-ui # approval modes, project defaults, overrides, audit and persistence
 npm run test:agent-setup-ui # chat-to-agent setup, preserved history/draft, approved writes
 npm run test:scaling-ui # history paging, repository search, worktree review/apply
 node tests/live-smoke.mjs  # opt-in: real Ollama, qwen3.5:0.8b already installed

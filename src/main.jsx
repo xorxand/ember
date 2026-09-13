@@ -463,7 +463,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v1.0.0</span>
+            <span>v1.0.1</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -1891,6 +1891,93 @@ function ProjectModal({ project, state, onClose, perform, onCreated }) {
     </Modal>
   );
 }
+function EnableAgentModal({ task, state, perform, onClose }) {
+  const [projectId, setProjectId] = useState(state.projects[0]?.id || "");
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  if (adding)
+    return (
+      <ProjectModal
+        state={state}
+        perform={perform}
+        onClose={() => setAdding(false)}
+        onCreated={(p) => setProjectId(p.id)}
+      />
+    );
+  return (
+    <Modal title="Enable Agent" onClose={onClose}>
+      <form
+        className="modal-body form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setSaving(true);
+          setError("");
+          try {
+            await perform("tasks/enable-agent", { id: task.id, projectId });
+            onClose();
+          } catch (e) {
+            setError(e.message);
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <p>
+          Choose a project folder where Agent can work. This conversation and
+          your draft will stay here. Earlier requests will not run
+          automatically; send your next instruction after enabling Agent.
+        </p>
+        {state.projects.length > 0 && (
+          <label>
+            Project
+            <select
+              aria-label="Agent project"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              disabled={saving}
+            >
+              <option value="" disabled>
+                Choose a project
+              </option>
+              {state.projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — {p.path}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <Button
+          type="button"
+          icon="folder"
+          disabled={saving}
+          onClick={() => setAdding(true)}
+        >
+          Add a project folder
+        </Button>
+        <p className="small muted">
+          Agent can read files and propose edits and commands, including builds.
+          You review writes and commands before they run. Choose a model with
+          tool support.
+        </p>
+        {error && <p className="inline-error">{error}</p>}
+        <div className="dialog-actions">
+          <Button type="button" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            className="primary"
+            disabled={!projectId || saving}
+          >
+            {saving ? "Enabling…" : "Enable Agent"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 function Setup({ state, act, perform, openModels, onClose }) {
   const [detected, setDetected] = useState(null),
     [working, setWorking] = useState(false);
@@ -2212,7 +2299,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Version 1.0.0</Tag>
+            <Tag>Version 1.0.1</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -2251,6 +2338,11 @@ function TaskView({
   const [older, setOlder] = useState([]),
     [olderMore, setOlderMore] = useState(true),
     [loadingOlder, setLoadingOlder] = useState(false);
+  const [enablingAgent, setEnablingAgent] = useState(false);
+  const changeMode = (mode) => {
+    if (mode === "agent" && !project) setEnablingAgent(true);
+    else act("tasks/update", { id: task.id, mode });
+  };
   const visibleMessages = [
     ...older.filter((m) => !task.messages.some((n) => n.id === m.id)),
     ...task.messages,
@@ -2260,9 +2352,6 @@ function TaskView({
     fileRef = useRef(),
     follow = useRef(true);
   const active = busy(task);
-  const remote = !["localhost", "127.0.0.1", "[::1]"].includes(
-    new URL(state.settings.endpoint).hostname,
-  );
   const pending = task.approvals.filter((a) => a.status === "pending");
   useEffect(() => {
     localStorage.setItem(`ember.draft.${task.id}`, draft);
@@ -2450,8 +2539,22 @@ function TaskView({
                 <div className="message-content">
                   {m.role === "user" ? (
                     <div className="user-content">{m.content}</div>
+                  ) : m.executionCheck ? (
+                    <details className="tool-result">
+                      <summary>
+                        Draft response — checking tool execution
+                      </summary>
+                      <Markdown>{m.content}</Markdown>
+                    </details>
                   ) : (
                     <Markdown>{m.content}</Markdown>
+                  )}
+                  {m.executionSummary && (
+                    <div className="run-status" role="status">
+                      {m.executionSummary.toolCalls === 0
+                        ? "Response only: no tools ran, so no files were changed and no commands were executed. If you expected project work, choose another tool-capable model and retry."
+                        : `Tool calls: ${m.executionSummary.toolCalls} · File approvals applied: ${m.executionSummary.filesChanged} · Commands succeeded: ${m.executionSummary.commandsSucceeded}`}
+                    </div>
                   )}
                   {m.attachments?.length > 0 && (
                     <div className="attachment-list">
@@ -2646,13 +2749,11 @@ function TaskView({
               <select
                 aria-label="Task mode"
                 value={task.mode}
-                disabled={active}
-                onChange={(e) =>
-                  act("tasks/update", { id: task.id, mode: e.target.value })
-                }
+                disabled={active || task.archived || offline}
+                onChange={(e) => changeMode(e.target.value)}
               >
                 <option value="chat">Chat</option>
-                {project && <option value="agent">Agent</option>}
+                <option value="agent">Agent</option>
               </select>
               <span className="composer-divider" />
               <ModelSelect
@@ -2699,10 +2800,17 @@ function TaskView({
             />
             {task.mode === "agent"
               ? "File changes & commands require review"
-              : remote
-                ? "Runs on your configured server"
-                : "Runs on your machine"}
+              : "Chat only · no file edits or commands"}
           </span>
+          {task.mode === "chat" && (
+            <button
+              type="button"
+              disabled={active || task.archived || offline}
+              onClick={() => changeMode("agent")}
+            >
+              Enable Agent
+            </button>
+          )}
           {!task.model ? (
             <button onClick={() => openModels()}>Get a model</button>
           ) : (
@@ -2710,6 +2818,14 @@ function TaskView({
           )}
         </div>
       </div>
+      {enablingAgent && (
+        <EnableAgentModal
+          task={task}
+          state={state}
+          perform={perform}
+          onClose={() => setEnablingAgent(false)}
+        />
+      )}
     </section>
   );
 }

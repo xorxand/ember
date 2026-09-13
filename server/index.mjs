@@ -470,6 +470,23 @@ export async function createApp({
             throw new Error("Stop active task work before applying changes.");
           return json(res, await workspaces.apply(task, data.digest));
         }
+        if (route === "/api/tasks/enable-agent") {
+          const t = store.task(data.id);
+          const project = store.project(data.projectId);
+          await rootPath(project.path);
+          // Recheck after filesystem validation, since work can start while it awaits.
+          store.project(project.id);
+          if (activeStatuses.includes(t.status) || t.archived)
+            throw new Error("Stop or restore this task before enabling Agent.");
+          if (t.projectId || t.workspace || t.approvals.length)
+            throw new Error(
+              "This task already has project history. Create a new project task instead.",
+            );
+          t.projectId = project.id;
+          t.mode = "agent";
+          store.touch({ taskId: t.id });
+          return json(res, store.detail(t.id));
+        }
         if (route === "/api/tasks/update") {
           const t = store.task(data.id);
           if (

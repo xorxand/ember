@@ -1,22 +1,26 @@
-# Ember 1.0.0
+# Ember 1.0.1
 
-First published release of Ember, a local AI workspace powered by Ollama.
+Agent mode is now visible in every conversation, and the agent checks its tool results before treating a prose reply as its final answer. Previously, tasks without a project showed only Chat, and models could give instructions for work without actually doing it.
 
-- Chat and coding tasks organized into projects, with streaming responses and per-task model selection.
-- Browse, download, update, and manage local open-weight models; detect and reuse Ollama or install an app-owned Linux runtime.
-- SQLite conversation storage, paginated history, full-text task search, and incremental UI updates.
-- Repository text, file, and declaration search with targeted line excerpts.
-- Isolated Git task worktrees, file and command approvals, and reviewed application to the original project.
-- Linux x64 Debian package with bundled Electron runtime.
+- Select Agent or click Enable Agent, then choose an existing project or add a local folder.
+- Keep the same conversation and unsent draft when enabling Agent. Previous requests are not replayed.
+- Agent checks for unfinished work with at most two automatic follow-ups per turn. It never executes code copied from a prose response.
+- Final Agent responses show actual tool calls, applied file approvals, and successful commands. Responses with no tool calls explicitly say that nothing ran.
+- Chat mode explicitly explains that it cannot edit files or run commands.
+- Active and archived tasks cannot change their execution scope; existing project history cannot be reassigned to another folder.
 
-## Downloads
+Live verification: `qwen3.5:4b` created, compiled, and ran the requested Go countdown through approved commands, producing 10 through 1. `qwen2.5:1.5b` did not complete the same test reliably; use a stronger tool-capable model if the execution summary shows no useful work.
 
-Install `ember-local_1.0.0_amd64.deb` with `sudo apt install ./ember-local_1.0.0_amd64.deb`. Launch Ember from the application menu or run `ember`.
+## Install
 
-For the browser workspace, extract `ember-1.0.0.tar.gz`, enter `localmodel`, and run `node server/index.mjs` with Node.js 24 or newer. Open http://127.0.0.1:4317. The release asset includes the built UI; GitHub’s automatic source archives require `npm ci && npm run build` first.
+Download `ember-local_1.0.1_amd64.deb`, close Ember, and run:
 
-Verify downloads using `sha256sum -c SHA256SUMS` in the directory containing both assets.
+```sh
+sudo apt install ./ember-local_1.0.1_amd64.deb
+```
 
-## Known limitations
+Reopen Ember. Existing workspace data is retained. No model weights are bundled.
 
-Linux x64 is the packaged target. System-wide installation has not been tested on this host. Declaration lookup is heuristic, shell commands run with the user’s permissions after approval, and agent quality depends on the selected model. See README.md and VALIDATION.md for details.
+Alternatively, extract `ember-1.0.1.tar.gz`, enter `localmodel`, and run `node server/index.mjs` with Node.js 24 or newer. The release asset includes the built UI; GitHub automatic source archives need `npm ci && npm run build` first.
+
+Both assets have hashes in `SHA256SUMS`. System-wide installation is not verified on this host; see VALIDATION.md for the test record.

@@ -41,3 +41,14 @@ Revalidated from the repository at its new location:
 System-wide package installation is still unverified on this host.
 
 Native Electron smoke also passed under Xvfb (virtual display), using the existing test-only sandbox override; production packaging keeps sandboxing enabled.
+
+## Version 1.0.1 — Agent setup (September 13, 2026)
+
+- All 24 backend/unit/integration tests passed, including chat-to-agent conversion, retained conversation history, no automatic request replay, and invalid/active/archived task guards.
+- New Agent setup browser workflow passed: visible Agent option without a project, cancellation, adding a folder, retaining history and draft, explicit write approval and actual file creation, choosing an existing project, and switching modes.
+- All 12 existing browser workflows and the scaling workflow passed with no reported browser errors.
+- Production UI and Linux amd64 Debian package rebuilt. System-wide installation remains unverified.
+
+- Added deterministic recovery tests: a prose-only answer followed by actual approved writes; a missing command recovered after a write; and bounded no-tool replies explicitly labeled as response-only.
+- Live Ollama `qwen3.5:4b` executed the exact countdown request in a temporary project: approved source-file creation, approved `go build -o count_down count_down.go && ./count_down`, exit code 0, and output 10 through 1. The resulting executable was independently rerun and produced the same output. The user’s project was not modified.
+- A live `qwen2.5:1.5b` run called a build command before creating source, then failed to recover. Tool capability metadata alone does not establish model reliability.

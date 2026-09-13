@@ -66,6 +66,102 @@ test("API requires token and same-origin requests, and keeps workspace persisten
     "A real task",
   );
 });
+test("enabling Agent attaches an idle chat without replaying history and rejects scope changes", async (t) => {
+  const { app, mock, call, projectPath } = await fixture(t);
+  const project = (await call("projects", { path: projectPath })).data;
+  const chat = (await call("tasks", { title: "Keep this conversation" })).data;
+  await call("tasks/send", { id: chat.id, content: "write a file" });
+  assert.equal(
+    (await call("tasks/enable-agent", { id: chat.id, projectId: project.id }))
+      .status,
+    400,
+  );
+  await until(() => app.store.task(chat.id).status === "complete");
+  const before = JSON.stringify(app.store.task(chat.id).messages);
+  const requests = mock.received.filter((r) => r.route === "/api/chat").length;
+  assert.equal(
+    (await call("tasks/enable-agent", { id: chat.id, projectId: "missing" }))
+      .status,
+    400,
+  );
+  assert.equal(app.store.task(chat.id).projectId, null);
+  const enabled = await call("tasks/enable-agent", {
+    id: chat.id,
+    projectId: project.id,
+  });
+  assert.equal(enabled.status, 200);
+  assert.equal(enabled.data.mode, "agent");
+  assert.equal(enabled.data.projectId, project.id);
+  assert.equal(JSON.stringify(app.store.task(chat.id).messages), before);
+  assert.equal(
+    mock.received.filter((r) => r.route === "/api/chat").length,
+    requests,
+  );
+  assert.equal(
+    (await call("tasks/enable-agent", { id: chat.id, projectId: project.id }))
+      .status,
+    400,
+  );
+  const archived = (await call("tasks", {})).data;
+  await call("tasks/update", { id: archived.id, archived: true });
+  assert.equal(
+    (
+      await call("tasks/enable-agent", {
+        id: archived.id,
+        projectId: project.id,
+      })
+    ).status,
+    400,
+  );
+});
+test("Agent recovers from prose-only replies and checks for unfinished command work", async (t) => {
+  const { app, call, projectPath } = await fixture(t);
+  const project = (await call("projects", { path: projectPath })).data;
+  const task = (await call("tasks", { projectId: project.id, mode: "agent" }))
+    .data;
+  await call("tasks/send", {
+    id: task.id,
+    content: "write prose-recovery compile-recovery",
+  });
+  const stored = app.store.task(task.id);
+  await until(() => stored.status === "approval");
+  assert.equal(stored.approvals.at(-1).kind, "write");
+  await call("approvals", { id: stored.approvals.at(-1).id, approve: true });
+  await until(() =>
+    stored.approvals.some(
+      (a) => a.kind === "command" && a.status === "pending",
+    ),
+  );
+  await call("approvals", { id: stored.approvals.at(-1).id, approve: true });
+  await until(() => stored.status === "complete");
+  assert.deepEqual(stored.messages.at(-1).executionSummary, {
+    toolCalls: 2,
+    filesChanged: 1,
+    commandsSucceeded: 1,
+  });
+  assert.equal(stored.approvals.length, 2);
+  assert.ok(
+    stored.messages.some(
+      (m) => m.role === "tool" && m.content.includes("build-verified"),
+    ),
+  );
+});
+test("Agent labels stubborn prose-only responses without inventing execution or looping forever", async (t) => {
+  const { app, mock, call, projectPath } = await fixture(t);
+  const project = (await call("projects", { path: projectPath })).data;
+  const task = (await call("tasks", { projectId: project.id, mode: "agent" }))
+    .data;
+  await call("tasks/send", { id: task.id, content: "response-only" });
+  const stored = app.store.task(task.id);
+  await until(() => stored.status === "complete");
+  assert.deepEqual(stored.messages.at(-1).executionSummary, {
+    toolCalls: 0,
+    filesChanged: 0,
+    commandsSucceeded: 0,
+  });
+  assert.equal(mock.received.filter((r) => r.route === "/api/chat").length, 2);
+  assert.equal(stored.approvals.length, 0);
+});
 test("streaming chat, task queue, cancellation, and model mutation guards", async (t) => {
   const { app, call } = await fixture(t);
   const first = (await call("tasks", {})).data;

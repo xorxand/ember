@@ -67,8 +67,56 @@ export async function mockOllama() {
     }
     if (req.url === "/api/chat") {
       const user =
-        body.messages.findLast((m) => m.role === "user")?.content || "";
+        body.messages.findLast(
+          (m) =>
+            m.role === "user" &&
+            !m.content.startsWith("Ember execution check (automatic):"),
+        )?.content || "";
       const last = body.messages.at(-1);
+      if (
+        body.tools &&
+        user.includes("prose-recovery") &&
+        !body.messages.some((m) => m.role === "tool") &&
+        !body.messages[0].content.includes("Execution check:")
+      ) {
+        emit({
+          message: {
+            role: "assistant",
+            content: "Here is the code. You can save it yourself.",
+          },
+          done: true,
+        });
+        return res.end();
+      }
+      if (
+        body.tools &&
+        user.includes("compile-recovery") &&
+        body.messages.some(
+          (m) => m.role === "tool" && m.tool_name === "write_file",
+        ) &&
+        !body.messages.some(
+          (m) => m.role === "tool" && m.tool_name === "run_command",
+        )
+      ) {
+        emit({
+          message: body.messages[0].content.includes("Execution check:")
+            ? {
+                role: "assistant",
+                content: "",
+                tool_calls: [
+                  {
+                    function: {
+                      name: "run_command",
+                      arguments: { command: "printf build-verified" },
+                    },
+                  },
+                ],
+              }
+            : { role: "assistant", content: "Now you can compile it." },
+          done: true,
+        });
+        return res.end();
+      }
       if (
         body.tools &&
         !body.messages.some((m) => m.role === "tool") &&

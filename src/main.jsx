@@ -463,7 +463,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v0.2</span>
+            <span>v1.0.0</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -2212,7 +2212,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Preview 0.2</Tag>
+            <Tag>Version 1.0.0</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.

@@ -6,21 +6,23 @@ A Codex-inspired local AI workspace powered by Ollama. Projects and multiple tas
 
 ### Browser workspace — quickest start
 
-Requires **Node.js 24 or newer**. The release source includes a prebuilt interface; the server uses only Node built-ins:
+Requires **Node.js 24 or newer**. The `ember-1.0.0.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
 
 ```bash
-cd ember
+cd localmodel
 node server/index.mjs
 ```
 
 Open **http://127.0.0.1:4317**. Set `PORT` to change the port. Stop with Ctrl+C. Project folders can be added by absolute path.
 
+Cloning the repository instead? Run `npm ci` and `npm run build` before starting the server. GitHub’s automatic source archives also need this build step.
+
 ### Linux desktop package
 
-The Debian/Ubuntu x64 package is in `release/ember-local_0.2.0_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/localmodel/releases/tag/1.0.0). Local builds place it in `release/ember-local_1.0.0_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_0.2.0_amd64.deb
+sudo apt install ./release/ember-local_1.0.0_amd64.deb
 ember
 ```
 
@@ -50,7 +52,7 @@ npm run desktop
 
 The browser launch stores workspace data in `.data/` next to this README. The desktop package uses `~/.config/Ember/workspace` on Linux. Override either with `EMBER_DATA_DIR=/absolute/folder`.
 
-Version 0.2 uses **SQLite with WAL transactions**, separate task/message/approval rows, indexed full-text conversation search, and lazy history loading. An existing `workspace.json` is imported once and preserved unchanged alongside a `workspace.json.pre-sqlite` backup. Stop older Ember processes before migrating. To back up SQLite, close Ember and copy the data folder; while running, the `-wal` file may contain recent changes and must not be omitted. Data is local and owner-readable, without encryption. Use one Ember service per data folder.
+Ember uses **SQLite with WAL transactions**, separate task/message/approval rows, indexed full-text conversation search, and lazy history loading. An existing `workspace.json` is imported once and preserved unchanged alongside a `workspace.json.pre-sqlite` backup. Stop older Ember processes before migrating. To back up SQLite, close Ember and copy the data folder; while running, the `-wal` file may contain recent changes and must not be omitted. Data is local and owner-readable, without encryption. Use one Ember service per data folder.
 
 The UI opens with at most 100 task summaries, fetches only the selected conversation, and sends incremental event patches during generation. Conversation history starts with 60 recent messages; use **Load earlier messages** for older pages. Task navigation has previous/next pages and server-side full-text search. The agent keeps a bounded recent history window, trimming complete turns to the context budget.
 
@@ -77,7 +79,7 @@ node tests/live-smoke.mjs  # opt-in: real Ollama, qwen3.5:0.8b already installed
 
 The UI suite needs Playwright's Chromium (`npx playwright install chromium` if not already installed). Test workspaces are temporary and cleaned afterward. Live smoke creates a temporary project, exercises chat and a file-reading tool, checks the registry fingerprint, and pulls an already-installed model. Set `EMBER_TEST_MODEL` to use another installed model; the agent check needs tool support. Live smoke actually uses local compute and may update the specified model tag.
 
-## Preview limitations
+## Known limitations
 
 - Linux x64 is the packaged target. macOS and Windows builds/signing have not been prepared or tested.
 - Ollama's public library has no stable documented discovery API used here. The catalog adapter parses the public library and tags pages, with cached data and manual model-name pulls as fallbacks if the markup changes. The initial catalog is empty until its first successful fetch.

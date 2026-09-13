@@ -7,6 +7,9 @@ if (process.platform !== "linux" || process.arch !== "x64")
   throw new Error(
     "This packaging script currently builds Linux x64 Debian packages.",
   );
+const { version } = JSON.parse(
+  await fs.readFile(path.join(root, "package.json"), "utf8"),
+);
 const release = path.join(root, "release");
 const stage = path.join(release, "debian");
 const appDir = path.join(stage, "opt", "ember");
@@ -35,7 +38,7 @@ const controlDir = path.join(stage, "DEBIAN");
 await fs.mkdir(controlDir, { recursive: true });
 await fs.writeFile(
   path.join(controlDir, "control"),
-  `Package: ember-local\nVersion: 0.2.0\nSection: devel\nPriority: optional\nArchitecture: amd64\nMaintainer: Ember Project <noreply@example.invalid>\nDepends: git, ripgrep, libgtk-3-0, libnss3, libxss1, libgbm1, libasound2 | libasound2t64, libatk-bridge2.0-0, libdrm2, libxkbcommon0, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libxfixes3, libxext6\nDescription: Local AI workspace powered by Ollama\n Projects, tasks, model discovery and downloads, streaming chat, and coding tools.\n`,
+  `Package: ember-local\nVersion: ${version}\nSection: devel\nPriority: optional\nArchitecture: amd64\nMaintainer: xorxand <xorxand@users.noreply.github.com>\nHomepage: https://github.com/xorxand/localmodel\nDepends: git, ripgrep, libgtk-3-0, libnss3, libxss1, libgbm1, libasound2 | libasound2t64, libatk-bridge2.0-0, libdrm2, libxkbcommon0, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libxfixes3, libxext6\nDescription: Local AI workspace powered by Ollama\n Projects, tasks, model discovery and downloads, streaming chat, and coding tools.\n`,
 );
 await fs.chmod(path.join(appDir, "chrome-sandbox"), 0o4755);
 await fs.writeFile(
@@ -56,7 +59,7 @@ await fs.copyFile(
   path.join(root, "electron/icon.svg"),
   path.join(iconDir, "ember-local.svg"),
 );
-const output = path.join(release, "ember-local_0.2.0_amd64.deb");
+const output = path.join(release, `ember-local_${version}_amd64.deb`);
 execFileSync(
   "dpkg-deb",
   ["--root-owner-group", "-Zgzip", "-z6", "--build", stage, output],

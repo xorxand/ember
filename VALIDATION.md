@@ -27,3 +27,17 @@ The running preview's workspace data is separate from test fixtures. Test projec
 - Added a browser workflow covering older-message loading, isolated edits, repository search with excerpts, and reviewed application back to the original project.
 
 Declaration lookup remains heuristic; language-server symbol/reference indexing is a future extension. SQLite in the bundled Node 24 runtime currently emits an experimental-API warning. No external database or native npm database extension is needed.
+
+## Version 1.0.0 release — September 13, 2026
+
+Revalidated from the repository at its new location:
+
+- All 21 backend/unit/integration tests passed.
+- Production UI build passed (20 modules).
+- All 12 standard browser workflows passed with no browser page errors.
+- Scaling browser workflow passed: history paging, Git isolation, repository search/excerpts, and reviewed apply.
+- Linux amd64 Debian package built successfully; version metadata, launcher, shared modules, and root-owned mode 4755 sandbox helper verified.
+
+System-wide package installation is still unverified on this host.
+
+Native Electron smoke also passed under Xvfb (virtual display), using the existing test-only sandbox override; production packaging keeps sandboxing enabled.

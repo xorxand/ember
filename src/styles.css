@@ -3019,3 +3019,106 @@ button {
 .detail-intro p {
   font-size: 12px;
 }
+.history-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+.workspace-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 28px;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.workspace-note span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.workspace-note button {
+  color: var(--accent);
+  font-size: 10px;
+}
+.repository-search {
+  padding: 14px;
+}
+.repository-search form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 15px;
+}
+.repository-search form > div {
+  display: flex;
+  gap: 9px;
+}
+.repository-search input {
+  width: 100%;
+  font-size: 11px;
+}
+.repository-search select {
+  font-size: 11px;
+  flex: 1;
+}
+.search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.search-result strong {
+  font-size: 11px;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.search-result code {
+  font-size: 10px;
+  display: block;
+  color: var(--muted);
+  margin-top: 7px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.search-excerpt {
+  margin-top: 16px;
+  font-size: 11px;
+}
+.search-excerpt pre,
+.worktree-review pre {
+  font-size: 10px;
+  line-height: 1.7;
+  overflow: auto;
+  max-height: 300px;
+}
+.worktree-review {
+  padding: 15px;
+  border-bottom: 1px solid var(--border);
+}
+.worktree-review > strong {
+  font-size: 12px;
+}
+.worktree-review > code {
+  display: block;
+  font-size: 10px;
+  color: var(--accent);
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.worktree-review p {
+  margin: 12px 0;
+}
+.worktree-review details {
+  margin: 12px 0;
+  font-size: 11px;
+}
+.panel-tabs {
+  gap: 11px;
+}

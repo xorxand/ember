@@ -19,7 +19,14 @@ await fs.rename(path.join(appDir, "electron"), path.join(appDir, "ember"));
 await fs.rm(path.join(appDir, "resources/default_app.asar"), { force: true });
 const resources = path.join(appDir, "resources/app");
 await fs.mkdir(resources, { recursive: true });
-for (const name of ["server", "electron", "dist", "package.json", "README.md"])
+for (const name of [
+  "server",
+  "shared",
+  "electron",
+  "dist",
+  "package.json",
+  "README.md",
+])
   await fs.cp(path.join(root, name), path.join(resources, name), {
     recursive: true,
   });
@@ -28,7 +35,7 @@ const controlDir = path.join(stage, "DEBIAN");
 await fs.mkdir(controlDir, { recursive: true });
 await fs.writeFile(
   path.join(controlDir, "control"),
-  `Package: ember-local\nVersion: 0.1.0\nSection: devel\nPriority: optional\nArchitecture: amd64\nMaintainer: Ember Project <noreply@example.invalid>\nDepends: libgtk-3-0, libnss3, libxss1, libgbm1, libasound2 | libasound2t64, libatk-bridge2.0-0, libdrm2, libxkbcommon0, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libxfixes3, libxext6\nDescription: Local AI workspace powered by Ollama\n Projects, tasks, model discovery and downloads, streaming chat, and coding tools.\n`,
+  `Package: ember-local\nVersion: 0.2.0\nSection: devel\nPriority: optional\nArchitecture: amd64\nMaintainer: Ember Project <noreply@example.invalid>\nDepends: git, ripgrep, libgtk-3-0, libnss3, libxss1, libgbm1, libasound2 | libasound2t64, libatk-bridge2.0-0, libdrm2, libxkbcommon0, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libxfixes3, libxext6\nDescription: Local AI workspace powered by Ollama\n Projects, tasks, model discovery and downloads, streaming chat, and coding tools.\n`,
 );
 await fs.chmod(path.join(appDir, "chrome-sandbox"), 0o4755);
 await fs.writeFile(
@@ -49,7 +56,7 @@ await fs.copyFile(
   path.join(root, "electron/icon.svg"),
   path.join(iconDir, "ember-local.svg"),
 );
-const output = path.join(release, "ember-local_0.1.0_amd64.deb");
+const output = path.join(release, "ember-local_0.2.0_amd64.deb");
 execFileSync(
   "dpkg-deb",
   ["--root-owner-group", "-Zgzip", "-z6", "--build", stage, output],

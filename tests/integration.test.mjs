@@ -60,7 +60,9 @@ test("API requires token and same-origin requests, and keeps workspace persisten
   assert.equal(response.status, 200);
   assert.equal((await call("state")).data.tasks[0].title, "A real task");
   assert.equal(
-    JSON.parse(await fs.readFile(app.store.file)).tasks[0].title,
+    JSON.parse(
+      app.store.db.prepare("SELECT data FROM tasks LIMIT 1").get().data,
+    ).title,
     "A real task",
   );
 });

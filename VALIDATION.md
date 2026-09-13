@@ -14,6 +14,16 @@
 - Installing the Debian package system-wide: requires administrator access to configure Electron's sandbox helper. Package contents and modes are inspected, but a normal installed launch remains to be checked after installation.
 - Fresh Ollama installation: implementation was not executed because this machine already has Ollama. It supports an app-owned Linux x64/ARM64 runtime download; optional ROCm packages and OS GPU drivers are not installed.
 - macOS/Windows packaging, signing, and native dialogs on those platforms.
-- Large-model memory behavior, image/PDF ingestion, long-running interactive terminals, and Git worktree isolation.
+- Large-model memory behavior, image/PDF ingestion, long-running interactive terminals, and cross-platform native installation.
 
 The running preview's workspace data is separate from test fixtures. Test projects and their files are removed after tests. Existing Ollama model weights were reused; no extra large model was downloaded for testing.
+
+## Version 0.2 — scaling changes (September 13)
+
+- Migrated a fixture with **120 tasks and 28,800 messages** into normalized SQLite storage. Confirmed legacy backup preservation, zero eagerly loaded conversation caches, 100-summary paging, 60-message history pages without overlap, and full-text hits from older messages. Updating one streamed answer wrote only that message row.
+- Verified incremental immutable patches, including text appends, new messages, and deletion. A five-character append to a 50,000-character answer plus one new message produced under 350 bytes of patches.
+- Verified two Git agents awaiting review concurrently in distinct worktrees. Source files remained unchanged until explicit apply. Confirmed refusal on dirty original checkout and stale review fingerprints, and preservation of the other task's files.
+- Verified repository text/file/declaration search, Git-ignore and secret exclusions, symlink boundaries, and bounded line excerpts. A separate synthetic **5,000-file** text-search run found the target in **17 ms** with ripgrep on this host. This is a small-file smoke benchmark, not a universal performance guarantee.
+- Added a browser workflow covering older-message loading, isolated edits, repository search with excerpts, and reviewed application back to the original project.
+
+Declaration lookup remains heuristic; language-server symbol/reference indexing is a future extension. SQLite in the bundled Node 24 runtime currently emits an experimental-API warning. No external database or native npm database extension is needed.

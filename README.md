@@ -17,10 +17,10 @@ Open **http://127.0.0.1:4317**. Set `PORT` to change the port. Stop with Ctrl+C.
 
 ### Linux desktop package
 
-The Debian/Ubuntu x64 package is in `release/ember-local_0.1.0_amd64.deb`.
+The Debian/Ubuntu x64 package is in `release/ember-local_0.2.0_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_0.1.0_amd64.deb
+sudo apt install ./release/ember-local_0.2.0_amd64.deb
 ember
 ```
 
@@ -39,7 +39,7 @@ npm run desktop
 
 - **Projects and tasks:** connect real folders, persistent conversation history, task rename, archive/restore, search, per-project instructions and model defaults. Each task independently selects Chat or Agent mode and an installed model.
 - **Streaming chat:** native Ollama streaming, Markdown rendering, code blocks, copy response, text attachments, output token/speed metrics, cancellation, and context-budget handling.
-- **Coding agent:** list/read project files, propose complete file changes, inspect a before/after diff, approve or reject each write and command, capture terminal output, and continue the agent loop with tool results. Up to 12 model steps per turn.
+- **Coding agent:** fast literal code search, file-name search, declaration lookup, bounded line excerpts, list/read project files, propose complete file changes, inspect a before/after diff, approve or reject each write and command, capture terminal output, and continue the agent loop with tool results. Up to 12 model steps per turn.
 - **Model discovery:** a live, searchable Ollama library with capabilities, parameter variants, size and context metadata. Popularity/name/recent-update sorting, cached catalog, model-card/license links, and manual pulls by exact model name.
 - **Installed model management:** local/cloud distinction, default selection, license/details inspection, unload from memory, remove with confirmation, and registry fingerprint checks for updates. Updates never silently replace models in queued or active tasks.
 - **Downloads:** streaming layer progress, one-at-a-time queue, pause/resume using Ollama's cached layers, errors/retry, completed history, and refresh of installed models after completion. Download state survives app restarts.
@@ -48,7 +48,11 @@ npm run desktop
 
 ## Local data and privacy
 
-The browser launch stores workspace JSON in `.data/` next to this README. The desktop package stores it in its Electron user-data directory, generally `~/.config/Ember/workspace` (exact casing follows Electron's app name). Override either with `EMBER_DATA_DIR=/absolute/folder`. User data contains conversation content, project paths, file proposals, and settings. It is written atomically with owner-only file permissions, without encryption. Back up the data folder while Ember is closed.
+The browser launch stores workspace data in `.data/` next to this README. The desktop package uses `~/.config/Ember/workspace` on Linux. Override either with `EMBER_DATA_DIR=/absolute/folder`.
+
+Version 0.2 uses **SQLite with WAL transactions**, separate task/message/approval rows, indexed full-text conversation search, and lazy history loading. An existing `workspace.json` is imported once and preserved unchanged alongside a `workspace.json.pre-sqlite` backup. Stop older Ember processes before migrating. To back up SQLite, close Ember and copy the data folder; while running, the `-wal` file may contain recent changes and must not be omitted. Data is local and owner-readable, without encryption. Use one Ember service per data folder.
+
+The UI opens with at most 100 task summaries, fetches only the selected conversation, and sends incremental event patches during generation. Conversation history starts with 60 recent messages; use **Load earlier messages** for older pages. Task navigation has previous/next pages and server-side full-text search. The agent keeps a bounded recent history window, trimming complete turns to the context budget.
 
 Ollama owns the actual model weights. Ember reuses the model store of the connected server. Deleting a model removes its Ollama reference; shared layers may remain. The model-size total is not a physical disk-usage measurement because layers can be shared.
 
@@ -66,7 +70,8 @@ File tools enforce the real project root, including symlink checks; parent trave
 
 ```bash
 npm test               # backend/unit/integration suite using an isolated mock Ollama
-npm run test:ui        # Playwright flows against isolated fixtures
+npm run test:ui        # existing Playwright workflows
+npm run test:scaling-ui # history paging, repository search, worktree review/apply
 node tests/live-smoke.mjs  # opt-in: real Ollama, qwen3.5:0.8b already installed
 ```
 
@@ -81,8 +86,10 @@ The UI suite needs Playwright's Chromium (`npx playwright install chromium` if n
 - Text attachments only; no image/PDF ingestion, RAG index, web tools, MCP plugins, or interactive terminal programs yet.
 - Agent reliability varies by model. Models must advertise tool support for Agent mode. Tool errors and step limits remain visible in the transcript.
 - Interrupted turns are retained and marked after restart; generation does not automatically resume. Paused downloads resume when requested.
-- There is no Git worktree isolation for simultaneous tasks editing the same project. Stale-write checks catch file changes between proposal and approval, but shell commands require care.
-- Storage is a versioned JSON document. For very large histories, a database and incremental event protocol would be a sensible next step.
+- Git agent tasks use isolated worktrees and branches from committed HEAD. Uncommitted source changes are deliberately not copied. Non-Git project agents run one at a time in their original folder. An initial Git commit is required for isolation.
+- **Review all changes** in the Changes panel includes modified, deleted, new, and task-committed files. **Apply to original project** validates the reviewed patch fingerprint and requires the original checkout to be clean at the same base commit; it leaves applied changes uncommitted. If the original branch has advanced, integrate the task branch with normal Git tools. Worktrees and branches are retained, including after archive, to avoid losing unfinished work.
+- Declaration lookup recognizes common function/class/type definitions heuristically. It is not a language-server or semantic dependency index. Repository search uses ripgrep when available (included as a Linux package dependency); a bounded fallback is available, but does not implement Git ignore rules. Search results explicitly report when limits are reached.
+- SQLite removes full-history rewrites, but task metadata is still held in memory. This is not a distributed/multi-user service. Search, line excerpts, history pages, and stream buffers are bounded; no claim is made of unlimited repository size or model context.
 
 ## Structure
 
@@ -94,7 +101,10 @@ The UI suite needs Playwright's Chromium (`npx playwright install chromium` if n
 - `server/catalog.mjs` — live catalog, variants, manifest fingerprints
 - `server/downloads.mjs` — persistent download queue
 - `server/installer.mjs` — app-owned Linux Ollama installation
-- `server/store.mjs` — atomic local persistence and restart recovery
+- `server/store.mjs` — SQLite migration, normalized persistence, full-text history search, and paging
+- `server/workspaces.mjs` — isolated Git branches, review, and guarded apply
+- `server/search.mjs` — ripgrep search, bounded fallback, and line retrieval
+- `shared/state-patches.js` — incremental server/UI update protocol
 - `electron/` — desktop window, native bridge, app icon
 - `tests/` — controlled fixtures, backend/UI/live smoke tests
 

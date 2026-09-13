@@ -11,6 +11,9 @@ import { Catalog } from "./catalog.mjs";
 import { Downloads } from "./downloads.mjs";
 import { Agent } from "./agent.mjs";
 import { Installer } from "./installer.mjs";
+import { Workspaces } from "./workspaces.mjs";
+import { Search } from "./search.mjs";
+import { diffState } from "../shared/state-patches.js";
 import { rootPath, listFiles, readFile, runCommand } from "./projects.mjs";
 const root = fileURLToPath(new URL("..", import.meta.url));
 export async function createApp({
@@ -27,7 +30,9 @@ export async function createApp({
   const ollama = new Ollama(store),
     catalog = new Catalog(store),
     downloads = new Downloads(store, ollama),
-    agent = new Agent(store, ollama),
+    workspaces = new Workspaces(store),
+    search = new Search(),
+    agent = new Agent(store, ollama, workspaces, search),
     installer = new Installer(store, ollama);
   const token = randomBytes(32).toString("hex");
   const clients = new Set();
@@ -35,24 +40,60 @@ export async function createApp({
   const terminalControllers = new Map();
   let serverOrigin = "";
   let timer;
-  const snapshot = () => ({
-    ...store.data,
-    ollama: ollama.status,
-    system: {
-      totalMemory: os.totalmem(),
-      freeMemory: os.freemem(),
-      platform: process.platform,
-      arch: process.arch,
-    },
-    installer: installer.status,
-    terminals,
-  });
+  const snapshot = (taskId = "", offset = 0, query = "", projectId = "") => {
+    const page = store.summaries({ offset, query, projectId });
+    const tasks = page.items;
+    if (taskId && store.byId.has(taskId)) {
+      const detail = store.detail(taskId);
+      const index = tasks.findIndex((t) => t.id === taskId);
+      if (index >= 0) tasks[index] = detail;
+      else tasks.push(detail);
+    }
+    return {
+      ...Object.fromEntries(
+        Object.entries(store.data).filter(([key]) => key !== "tasks"),
+      ),
+      tasks,
+      taskPage: { total: page.total, nextOffset: page.nextOffset, offset },
+      ollama: ollama.status,
+      system: {
+        totalMemory: os.totalmem(),
+        freeMemory: os.freemem(),
+        platform: process.platform,
+        arch: process.arch,
+      },
+      installer: installer.status,
+      terminals,
+    };
+  };
   const broadcast = () => {
     if (timer) return;
     timer = setTimeout(() => {
       timer = null;
-      const data = `data: ${JSON.stringify(snapshot())}\n\n`;
-      for (const res of clients) if (!res.destroyed) res.write(data);
+      for (const client of clients) {
+        if (client.res.destroyed) continue;
+        if (client.res.writableLength > 2_000_000) {
+          client.res.destroy();
+          continue;
+        }
+        const next = JSON.parse(
+          JSON.stringify(
+            snapshot(
+              client.taskId,
+              client.offset,
+              client.query,
+              client.projectId,
+            ),
+          ),
+        );
+        const patches = diffState(client.previous, next);
+        if (patches.length) {
+          client.res.write(
+            `data: ${JSON.stringify({ type: "patch", patches })}\n\n`,
+          );
+          client.previous = next;
+        }
+      }
     }, 90);
   };
   store.on("change", broadcast);
@@ -76,6 +117,14 @@ export async function createApp({
     typeof value === "string" &&
     Buffer.byteLength(value) === Buffer.byteLength(token) &&
     timingSafeEqual(Buffer.from(value), Buffer.from(token));
+  const projectRoot = (url) => {
+    const p = store.project(url.searchParams.get("id"));
+    const taskId = url.searchParams.get("task");
+    const task = taskId ? store.task(taskId) : null;
+    if (task && task.projectId !== p.id)
+      throw new Error("Task does not belong to this project.");
+    return workspaces.path(task, p);
+  };
   const server = http.createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
@@ -103,20 +152,90 @@ export async function createApp({
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
           });
-          res.write(`data: ${JSON.stringify(snapshot())}\n\n`);
-          clients.add(res);
+          const client = {
+            res,
+            taskId: url.searchParams.get("task") || "",
+            offset: Number(url.searchParams.get("offset")) || 0,
+            query: (url.searchParams.get("q") || "").slice(0, 500),
+            projectId: url.searchParams.get("project") || "",
+          };
+          client.previous = JSON.parse(
+            JSON.stringify(
+              snapshot(
+                client.taskId,
+                client.offset,
+                client.query,
+                client.projectId,
+              ),
+            ),
+          );
+          res.write(
+            `data: ${JSON.stringify({ type: "snapshot", state: client.previous })}\n\n`,
+          );
+          clients.add(client);
           const heartbeat = setInterval(
             () => res.write(": heartbeat\n\n"),
             20000,
           );
           res.on("close", () => {
-            clients.delete(res);
+            clients.delete(client);
             clearInterval(heartbeat);
           });
           return;
         }
         if (req.method === "GET" && route === "/api/state")
-          return json(res, snapshot());
+          return json(
+            res,
+            snapshot(
+              url.searchParams.get("task") || "",
+              Number(url.searchParams.get("offset")) || 0,
+              url.searchParams.get("q") || "",
+              url.searchParams.get("project") || "",
+            ),
+          );
+        if (req.method === "GET" && route === "/api/tasks/messages")
+          return json(
+            res,
+            store.messagePage(
+              url.searchParams.get("id"),
+              url.searchParams.get("before"),
+              url.searchParams.get("limit"),
+            ),
+          );
+        if (req.method === "GET" && route === "/api/tasks/worktree/review")
+          return json(
+            res,
+            await workspaces.review(store.task(url.searchParams.get("id"))),
+          );
+        if (req.method === "GET" && route === "/api/projects/excerpt") {
+          const line = Math.max(1, Number(url.searchParams.get("line")) || 1);
+          return json(
+            res,
+            await search.excerpt(
+              projectRoot(url),
+              url.searchParams.get("path"),
+              Math.max(1, line - 5),
+              line + 50,
+            ),
+          );
+        }
+        if (req.method === "GET" && route === "/api/projects/search") {
+          const p = store.project(url.searchParams.get("id"));
+          const taskId = url.searchParams.get("task");
+          const task = taskId ? store.task(taskId) : null;
+          if (task && task.projectId !== p.id)
+            throw new Error("Task does not belong to this project.");
+          const controller = new AbortController();
+          res.on("close", () => controller.abort());
+          return json(
+            res,
+            await search.search(workspaces.path(task, p), {
+              query: url.searchParams.get("q") || "",
+              kind: url.searchParams.get("kind") || "text",
+              signal: controller.signal,
+            }),
+          );
+        }
         if (req.method === "GET" && route === "/api/ollama/detect")
           return json(res, await ollama.detect());
         if (req.method === "GET" && route === "/api/catalog/tags")
@@ -136,14 +255,14 @@ export async function createApp({
           return json(
             res,
             await listFiles(
-              store.project(url.searchParams.get("id")).path,
+              projectRoot(url),
               url.searchParams.get("path") || "",
             ),
           );
         if (req.method === "GET" && route === "/api/projects/file")
           return json(res, {
             content: await readFile(
-              store.project(url.searchParams.get("id")).path,
+              projectRoot(url),
               url.searchParams.get("path"),
             ),
           });
@@ -336,7 +455,21 @@ export async function createApp({
           store.touch();
           return json(res, { ok: true });
         }
-        if (route === "/api/tasks") return json(res, store.addTask(data));
+        if (route === "/api/tasks") {
+          const t = store.addTask(data);
+          return json(res, store.detail(t.id));
+        }
+        if (route === "/api/tasks/worktree/apply") {
+          const task = store.task(data.id);
+          if (
+            activeStatuses.includes(task.status) ||
+            terminals.some(
+              (t) => t.taskId === task.id && t.status === "running",
+            )
+          )
+            throw new Error("Stop active task work before applying changes.");
+          return json(res, await workspaces.apply(task, data.digest));
+        }
         if (route === "/api/tasks/update") {
           const t = store.task(data.id);
           if (
@@ -359,12 +492,13 @@ export async function createApp({
             t.archived = data.archived;
           }
           store.touch();
-          return json(res, t);
+          return json(res, store.detail(t.id));
         }
         if (route === "/api/tasks/send")
           return json(
             res,
-            agent.enqueue(data.id, data.content, data.attachments),
+            (agent.enqueue(data.id, data.content, data.attachments),
+            store.detail(data.id)),
           );
         if (route === "/api/tasks/stop") {
           agent.cancel(data.id);
@@ -380,10 +514,15 @@ export async function createApp({
           const p = store.project(data.projectId);
           if (terminalControllers.size >= 4)
             throw new Error("At most four terminal commands can run at once.");
+          const task = data.taskId ? store.task(data.taskId) : null;
+          if (task && task.projectId !== p.id)
+            throw new Error("Task does not belong to this project.");
+          if (task) await workspaces.ensure(task, p);
           const controller = new AbortController();
           const job = {
             id: id(),
             projectId: p.id,
+            taskId: task?.id || null,
             command: data.command,
             output: "",
             status: "running",
@@ -396,7 +535,7 @@ export async function createApp({
           }
           terminalControllers.set(job.id, controller);
           broadcast();
-          runCommand(p.path, data.command, {
+          runCommand(workspaces.path(task, p), data.command, {
             signal: controller.signal,
             onData: (output) => {
               job.output = output;
@@ -493,6 +632,8 @@ export async function createApp({
     catalog,
     downloads,
     agent,
+    workspaces,
+    search,
     server,
     snapshot,
     async close() {
@@ -503,10 +644,16 @@ export async function createApp({
       downloads.close();
       installer.cancel();
       for (const c of terminalControllers.values()) c.abort();
-      for (const res of clients) res.end();
+      for (const client of clients) client.res.end();
       ollama.stopOwned();
       store.save();
-      await new Promise((r) => server.close(r));
+      await new Promise((r) => {
+        server.close(r);
+        server.closeAllConnections();
+      });
+      for (let i = 0; i < 100 && (agent.runs.size || downloads.active); i++)
+        await new Promise((r) => setTimeout(r, 20));
+      store.close();
     },
   };
 }

@@ -157,10 +157,21 @@ function App() {
     [toast, setToast] = useState(null),
     [panel, setPanel] = useState(""),
     [search, setSearch] = useState(""),
+    [searchQuery, setSearchQuery] = useState(""),
+    [pageOffset, setPageOffset] = useState(0),
     [collapsed, setCollapsed] = useState({}),
     [sidebar, setSidebar] = useState(true),
     [offline, setOffline] = useState(false),
     [modelTab, setModelTab] = useState("discover");
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearchQuery(search);
+      setPageOffset(0);
+    }, 200);
+    return () => clearTimeout(timeout);
+  }, [search]);
+  const projectFilter = view === "project" ? projectId || "" : "";
+  useEffect(() => setPageOffset(0), [projectFilter]);
   const toastTimer = useRef();
   const notify = (message, error = false) => {
     setToast({ message, error });
@@ -185,10 +196,19 @@ function App() {
     (async () => {
       while (!disposed) {
         try {
-          await subscribe((s) => {
-            setState(s);
-            setOffline(false);
-          }, controller.signal);
+          await subscribe(
+            (s) => {
+              setState(s);
+              setOffline(false);
+            },
+            controller.signal,
+            {
+              task: view === "task" ? taskId || "" : "",
+              offset: String(pageOffset),
+              q: searchQuery,
+              project: projectFilter,
+            },
+          );
         } catch (e) {
           if (disposed) break;
         }
@@ -202,7 +222,7 @@ function App() {
       disposed = true;
       controller.abort();
     };
-  }, []);
+  }, [taskId, view === "task", pageOffset, searchQuery, projectFilter]);
   useEffect(() => {
     if (state) document.documentElement.dataset.theme = state.settings.theme;
   }, [state?.settings.theme]);
@@ -269,14 +289,7 @@ function App() {
     ["queued", "downloading"].includes(d.status),
   );
   const activeTasks = state.tasks.filter(busy);
-  const filteredTasks = state.tasks.filter(
-    (t) =>
-      !t.archived &&
-      (!search ||
-        `${t.title} ${t.messages.map((m) => m.content).join(" ")}`
-          .toLowerCase()
-          .includes(search.toLowerCase())),
-  );
+  const filteredTasks = state.tasks.filter((t) => !t.archived);
   return (
     <div className={`app ${sidebar ? "" : "sidebar-hidden"}`}>
       <aside className="sidebar">
@@ -450,7 +463,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v0.1</span>
+            <span>v0.2</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -572,7 +585,7 @@ function App() {
             />
             {panel && project && (
               <ProjectPanel
-                key={project.id}
+                key={`${project.id}:${task.id}`}
                 project={project}
                 task={task}
                 state={state}
@@ -594,6 +607,28 @@ function App() {
             act={act}
           />
         )}
+        {state.taskPage?.total > 100 &&
+          !["models", "settings"].includes(view) && (
+            <div className="history-pagination">
+              <Button
+                disabled={pageOffset === 0}
+                onClick={() => setPageOffset(Math.max(0, pageOffset - 100))}
+              >
+                Previous tasks
+              </Button>
+              <span>
+                {pageOffset + 1}–
+                {Math.min(pageOffset + 100, state.taskPage.total)} of{" "}
+                {state.taskPage.total}
+              </span>
+              <Button
+                disabled={state.taskPage.nextOffset === null}
+                onClick={() => setPageOffset(state.taskPage.nextOffset)}
+              >
+                More tasks
+              </Button>
+            </div>
+          )}
       </main>
       {modal?.type === "project" && (
         <ProjectModal
@@ -2177,7 +2212,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Preview 0.1</Tag>
+            <Tag>Preview 0.2</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -2213,6 +2248,13 @@ function TaskView({
     [sending, setSending] = useState(false),
     [editingTitle, setEditingTitle] = useState(false),
     [title, setTitle] = useState(task.title);
+  const [older, setOlder] = useState([]),
+    [olderMore, setOlderMore] = useState(true),
+    [loadingOlder, setLoadingOlder] = useState(false);
+  const visibleMessages = [
+    ...older.filter((m) => !task.messages.some((n) => n.id === m.id)),
+    ...task.messages,
+  ];
   const messagesRef = useRef(),
     inputRef = useRef(),
     fileRef = useRef(),
@@ -2329,7 +2371,31 @@ function TaskView({
             el.scrollHeight - el.scrollTop - el.clientHeight < 100;
         }}
       >
-        {!task.messages.length ? (
+        {task.hasOlderMessages && olderMore && (
+          <Button
+            disabled={loadingOlder}
+            onClick={async () => {
+              setLoadingOlder(true);
+              follow.current = false;
+              try {
+                const page = await api(
+                  `tasks/messages?id=${task.id}&before=${encodeURIComponent(visibleMessages[0].id)}`,
+                );
+                setOlder((v) => [...page.messages, ...v]);
+                setOlderMore(page.hasMore);
+              } catch (e) {
+                notify(e.message, true);
+              } finally {
+                setLoadingOlder(false);
+              }
+            }}
+          >
+            {loadingOlder ? "Loading…" : "Load earlier messages"}
+          </Button>
+        )}
+        {task.detailLoaded === false ? (
+          <p className="inline-loading">Loading conversation…</p>
+        ) : !visibleMessages.length ? (
           <div className="conversation-empty">
             <Logo size={40} />
             <h2>
@@ -2349,7 +2415,7 @@ function TaskView({
             </span>
           </div>
         ) : (
-          task.messages.map((m, index) =>
+          visibleMessages.map((m, index) =>
             m.role === "tool" ? (
               <details className="tool-result" key={m.id}>
                 <summary>
@@ -2413,7 +2479,7 @@ function TaskView({
                     !m.content &&
                     !m.tool_calls?.length &&
                     active &&
-                    index === task.messages.length - 1 && (
+                    index === visibleMessages.length - 1 && (
                       <div className="thinking">
                         <i />
                         <i />
@@ -2483,6 +2549,23 @@ function TaskView({
           </div>
         )}
       </div>
+      {task.projectId && task.mode === "agent" && (
+        <div className="workspace-note">
+          <Icon name="branch" size={13} />
+          <span>
+            {task.workspace?.mode === "worktree"
+              ? `Isolated branch: ${task.workspace.branch}`
+              : task.workspace?.mode === "shared"
+                ? task.workspace.reason
+                : "Git projects start in a separate worktree from the latest commit. Uncommitted source changes stay in the original folder."}
+          </span>
+          {task.workspace?.mode === "worktree" && (
+            <button onClick={() => setPanel("changes")}>
+              Review project changes
+            </button>
+          )}
+        </div>
+      )}
       <div className="composer-wrap">
         {task.archived && (
           <div className="notice-banner">
@@ -2733,13 +2816,15 @@ function Diff({ before, after }) {
     </pre>
   );
 }
-function FileTree({ project, onFile, directory = "", depth = 0 }) {
+function FileTree({ project, onFile, taskId = "", directory = "", depth = 0 }) {
   const [files, setFiles] = useState(null),
     [expanded, setExpanded] = useState({}),
     [error, setError] = useState("");
   useEffect(() => {
     let alive = true;
-    api(`projects/files?id=${project.id}&path=${encodeURIComponent(directory)}`)
+    api(
+      `projects/files?id=${project.id}&task=${taskId}&path=${encodeURIComponent(directory)}`,
+    )
       .then((v) => {
         if (alive) setFiles(v);
       })
@@ -2749,7 +2834,7 @@ function FileTree({ project, onFile, directory = "", depth = 0 }) {
     return () => {
       alive = false;
     };
-  }, [project.id, directory]);
+  }, [project.id, directory, taskId]);
   if (error) return <p className="inline-error small">{error}</p>;
   if (!files) return <p className="muted small tree-loading">Loading files…</p>;
   return (
@@ -2776,6 +2861,7 @@ function FileTree({ project, onFile, directory = "", depth = 0 }) {
           {f.directory && expanded[f.path] && depth < 15 && (
             <FileTree
               project={project}
+              taskId={taskId}
               onFile={onFile}
               directory={f.path}
               depth={depth + 1}
@@ -2798,12 +2884,14 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
   const changes = task.approvals.filter((a) => a.kind === "write");
   const commands = [
     ...task.approvals.filter((a) => a.kind === "command"),
-    ...state.terminals.filter((t) => t.projectId === project.id),
+    ...state.terminals.filter(
+      (t) => t.projectId === project.id && (!t.taskId || t.taskId === task.id),
+    ),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
     <aside className="project-panel">
       <div className="panel-tabs">
-        {["files", "changes", "terminal"].map((v) => (
+        {["files", "search", "changes", "terminal"].map((v) => (
           <button
             key={v}
             className={panel === v ? "active" : ""}
@@ -2821,6 +2909,9 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
           onClick={() => setPanel("")}
         />
       </div>
+      {panel === "search" && (
+        <RepositorySearch project={project} task={task} notify={notify} />
+      )}
       {panel === "files" && (
         <>
           <div className="panel-subheader">
@@ -2852,15 +2943,16 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
               <pre className="file-content">{content}</pre>
             ) : (
               <FileTree
-                key={refresh}
+                key={`${refresh}:${task.workspace?.path || project.path}`}
                 project={project}
+                taskId={task.id}
                 onFile={async (f) => {
                   const seq = ++fileSeq.current;
                   setFile(f);
                   setContent("Loading…");
                   try {
                     const r = await api(
-                      `projects/file?id=${project.id}&path=${encodeURIComponent(f.path)}`,
+                      `projects/file?id=${project.id}&task=${task.id}&path=${encodeURIComponent(f.path)}`,
                     );
                     if (seq === fileSeq.current) setContent(r.content);
                   } catch (e) {
@@ -2874,6 +2966,10 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
       )}
       {panel === "changes" && (
         <div className="panel-content">
+          {task.workspace?.mode === "worktree" && (
+            <WorktreeReview task={task} act={act} notify={notify} />
+          )}
+
           {!changes.length ? (
             <Empty icon="branch" title="No changes yet">
               Proposed file edits will appear here for review.
@@ -2916,7 +3012,7 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
         <>
           <div className="terminal-context">
             <Icon name="folder" size={13} />
-            {project.path}
+            {task.workspace?.path || project.path}
           </div>
           <div className="panel-content terminal-content">
             {!commands.length ? (
@@ -2959,7 +3055,11 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
               e.preventDefault();
               if (
                 command.trim() &&
-                (await act("terminal", { projectId: project.id, command }))
+                (await act("terminal", {
+                  projectId: project.id,
+                  taskId: task.id,
+                  command,
+                }))
               )
                 setCommand("");
             }}
@@ -2984,6 +3084,160 @@ function ProjectPanel({ project, task, state, panel, setPanel, act, notify }) {
         </>
       )}
     </aside>
+  );
+}
+function RepositorySearch({ project, task, notify }) {
+  const [query, setQuery] = useState(""),
+    [kind, setKind] = useState("text"),
+    [result, setResult] = useState(null),
+    [working, setWorking] = useState(false),
+    [excerpt, setExcerpt] = useState(null);
+  const request = useRef(0);
+  return (
+    <div className="panel-content repository-search">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const seq = ++request.current;
+          setWorking(true);
+          try {
+            const r = await api(
+              `projects/search?id=${project.id}&task=${task.id}&q=${encodeURIComponent(query)}&kind=${kind}`,
+            );
+            if (seq === request.current) {
+              setResult(r);
+              setExcerpt(null);
+            }
+          } catch (e) {
+            notify(e.message, true);
+          } finally {
+            if (seq === request.current) setWorking(false);
+          }
+        }}
+      >
+        <input
+          aria-label="Search repository"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Find code, files, or symbols…"
+        />
+        <div>
+          <select
+            aria-label="Repository search mode"
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+          >
+            <option value="text">Code text</option>
+            <option value="files">File paths</option>
+            <option value="symbols">Declarations</option>
+          </select>
+          <Button type="submit" disabled={working}>
+            {working ? "Searching…" : "Search"}
+          </Button>
+        </div>
+      </form>
+      {result && (
+        <p className="small muted">
+          {result.matches.length} results · {result.engine}
+          {result.truncated ? " · Results limited; narrow your search." : ""}
+        </p>
+      )}
+      {result?.matches.map((m, i) => (
+        <button
+          className="search-result"
+          key={i}
+          onClick={async () => {
+            try {
+              const r = await api(
+                `projects/excerpt?id=${project.id}&task=${task.id}&path=${encodeURIComponent(m.path)}&line=${m.line || 1}`,
+              );
+              setExcerpt(r);
+            } catch (e) {
+              notify(e.message, true);
+            }
+          }}
+        >
+          <strong>
+            {m.path}
+            {m.line ? `:${m.line}` : ""}
+          </strong>
+          {m.symbol && <Tag>{m.symbol}</Tag>}
+          <code>{m.text}</code>
+        </button>
+      ))}
+      {excerpt && (
+        <div className="search-excerpt">
+          <strong>{excerpt.path}</strong>
+          <pre>{excerpt.content}</pre>
+        </div>
+      )}
+      {!result && (
+        <Empty icon="search" title="Find the relevant code">
+          Search stays inside this task’s folder and returns small, targeted
+          excerpts.
+        </Empty>
+      )}
+    </div>
+  );
+}
+function WorktreeReview({ task, act, notify }) {
+  const [review, setReview] = useState(null),
+    [working, setWorking] = useState(false);
+  return (
+    <div className="worktree-review">
+      <strong>Isolated task branch</strong>
+      <code>{task.workspace.branch}</code>
+      <p className="small muted">
+        Changes here do not affect your original project until you apply them.
+        The branch starts from committed HEAD.
+      </p>
+      <Button
+        disabled={busy(task) || working}
+        onClick={async () => {
+          setWorking(true);
+          try {
+            setReview(await api(`tasks/worktree/review?id=${task.id}`));
+          } catch (e) {
+            notify(e.message, true);
+          } finally {
+            setWorking(false);
+          }
+        }}
+      >
+        Review all changes
+      </Button>
+      {review && (
+        <>
+          <pre>{review.stat || "No changes"}</pre>
+          <details>
+            <summary>Inspect complete patch</summary>
+            <pre>{review.patch}</pre>
+          </details>
+          <Button
+            className="primary"
+            disabled={!review.patch || working || busy(task)}
+            onClick={async () => {
+              setWorking(true);
+              const result = await act("tasks/worktree/apply", {
+                id: task.id,
+                digest: review.digest,
+              });
+              if (result) {
+                notify(result.message);
+                setReview(null);
+              }
+              setWorking(false);
+            }}
+          >
+            Apply to original project
+          </Button>
+          <p className="small muted">
+            Requires an unchanged, clean original checkout. Changes are applied
+            without committing.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 class ErrorBoundary extends React.Component {

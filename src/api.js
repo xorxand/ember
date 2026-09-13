@@ -1,3 +1,4 @@
+import { applyPatches } from "../shared/state-patches.js";
 const token = document.querySelector('meta[name="ember-token"]').content;
 export async function api(route, data) {
   const res = await fetch(`/api/${route}`, {
@@ -12,8 +13,10 @@ export async function api(route, data) {
   if (!res.ok) throw new Error(value.error || "Request failed");
   return value;
 }
-export async function subscribe(onState, signal) {
-  const res = await fetch("/api/events", {
+export async function subscribe(onState, signal, options = {}) {
+  let state = null;
+  const params = new URLSearchParams(options);
+  const res = await fetch(`/api/events?${params}`, {
     headers: { "x-ember-token": token },
     signal,
   });
@@ -29,7 +32,14 @@ export async function subscribe(onState, signal) {
     while ((end = buffer.indexOf("\n\n")) >= 0) {
       const event = buffer.slice(0, end);
       buffer = buffer.slice(end + 2);
-      if (event.startsWith("data: ")) onState(JSON.parse(event.slice(6)));
+      if (event.startsWith("data: ")) {
+        const message = JSON.parse(event.slice(6));
+        state =
+          message.type === "snapshot"
+            ? message.state
+            : applyPatches(state, message.patches);
+        onState(state);
+      }
     }
   }
 }

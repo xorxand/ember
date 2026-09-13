@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-const ignored = new Set([
+export const ignored = new Set([
   "node_modules",
   ".git",
   ".data",
@@ -13,7 +13,7 @@ const ignored = new Set([
   "venv",
   "__pycache__",
 ]);
-const sensitive = (name) =>
+export const sensitive = (name) =>
   /^\.env(?:\.|$)/.test(name) ||
   /^(id_rsa|id_ed25519|credentials|auth\.json)$/.test(name) ||
   /\.(pem|key)$/.test(name);

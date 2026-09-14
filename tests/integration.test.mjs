@@ -498,3 +498,25 @@ test("Always run still supports cancellation of an executing automatic command",
   assert.equal(stored.approvals[0].status, "cancelled");
   assert.equal(stored.agentActivity.commandsSucceeded, 0);
 });
+
+test("Agent continues beyond 12 rounds and stops at the 100-round limit", async (t) => {
+  const { app, mock, call, projectPath } = await fixture(t);
+  await fs.writeFile(path.join(projectPath, "README.md"), "ok");
+  app.store.data.settings.contextLength = 65536;
+  const project = (await call("projects", { path: projectPath })).data;
+  const task = (await call("tasks", { projectId: project.id, mode: "agent" }))
+    .data;
+  await call("tasks/send", { id: task.id, content: "round-limit" });
+  const stored = app.store.task(task.id);
+  await until(
+    () => !["queued", "running", "approval"].includes(stored.status),
+    10000,
+  );
+  assert.equal(stored.status, "complete", stored.error);
+  assert.equal(
+    mock.received.filter((r) => r.route === "/api/chat").length,
+    100,
+  );
+  assert.equal(stored.messages.filter((m) => m.role === "tool").length, 100);
+  assert.match(stored.messages.at(-1).content, /100-round limit/);
+});

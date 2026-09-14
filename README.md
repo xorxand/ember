@@ -6,10 +6,10 @@ A Codex-inspired local AI workspace powered by Ollama. Projects and multiple tas
 
 ### Browser workspace — quickest start
 
-Requires **Node.js 24 or newer**. The `ember-1.1.0.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
+Requires **Node.js 24 or newer**. The `ember-1.1.1.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
 
 ```bash
-cd localmodel
+cd ember
 node server/index.mjs
 ```
 
@@ -19,10 +19,10 @@ Cloning the repository instead? Use `git clone https://github.com/xorxand/ember.
 
 ### Linux desktop package
 
-Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.1.0). Local builds place it in `release/ember-local_1.1.0_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.1.1). Local builds place it in `release/ember-local_1.1.1_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_1.1.0_amd64.deb
+sudo apt install ./release/ember-local_1.1.1_amd64.deb
 ember
 ```
 
@@ -41,7 +41,7 @@ npm run desktop
 
 - **Projects and tasks:** connect real folders, persistent conversation history, task rename, archive/restore, search, per-project instructions and model defaults. Each task independently selects Chat or Agent mode and an installed model.
 - **Streaming chat:** native Ollama streaming, Markdown rendering, code blocks, copy response, text attachments, output token/speed metrics, cancellation, and context-budget handling.
-- **Coding agent:** fast literal code search, file-name search, declaration lookup, bounded line excerpts, list/read project files, propose complete file changes, inspect a before/after diff, control automatic versus reviewed writes and commands, capture terminal output, and continue the agent loop with tool results. Up to 12 model steps per turn.
+- **Coding agent:** fast literal code search, file-name search, declaration lookup, bounded line excerpts, list/read project files, propose complete file changes, inspect a before/after diff, control automatic versus reviewed writes and commands, capture terminal output, and continue the agent loop with tool results. Up to 100 model-response rounds per turn (a round may contain multiple tool calls; execution-check retries also count).
 - **Model discovery:** a live, searchable Ollama library with capabilities, parameter variants, size and context metadata. Popularity/name/recent-update sorting, cached catalog, model-card/license links, and manual pulls by exact model name.
 - **Installed model management:** local/cloud distinction, default selection, license/details inspection, unload from memory, remove with confirmation, and registry fingerprint checks for updates. Updates never silently replace models in queued or active tasks.
 - **Downloads:** streaming layer progress, one-at-a-time queue, pause/resume using Ollama's cached layers, errors/retry, completed history, and refresh of installed models after completion. Download state survives app restarts.

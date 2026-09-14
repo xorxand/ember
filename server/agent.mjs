@@ -1,3 +1,4 @@
+import { MAX_AGENT_ROUNDS } from "../shared/agent-limits.js";
 import {
   effectiveApprovalPolicy,
   approvalDecision,
@@ -284,7 +285,7 @@ export class Agent {
       let completionChecks = 0;
       let lastCheckedToolCount = -1;
       let verifyCompletion = false;
-      for (let iteration = 0; iteration < 12; iteration++) {
+      for (let iteration = 0; iteration < MAX_AGENT_ROUNDS; iteration++) {
         signal.throwIfAborted();
         const messages = this.history(task, project);
         if (verifyCompletion) {
@@ -357,7 +358,7 @@ export class Agent {
           if (
             task.mode === "agent" &&
             completionChecks < 2 &&
-            iteration < 11 &&
+            iteration < MAX_AGENT_ROUNDS - 1 &&
             task.agentActivity.toolCalls > lastCheckedToolCount
           ) {
             completionChecks++;
@@ -505,13 +506,12 @@ export class Agent {
           });
           this.store.touch({ taskId: task.id });
         }
-        if (iteration === 11) {
+        if (iteration === MAX_AGENT_ROUNDS - 1) {
           task.status = "complete";
           task.messages.push({
             id: id(),
             role: "assistant",
-            content:
-              "I reached the 12-step limit for this turn. Send a message to continue.",
+            content: `I reached the ${MAX_AGENT_ROUNDS}-round limit for this turn. Send a message to continue.`,
             createdAt: new Date().toISOString(),
           });
         }

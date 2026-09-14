@@ -73,6 +73,24 @@ export async function mockOllama() {
             !m.content.startsWith("Ember execution check (automatic):"),
         )?.content || "";
       const last = body.messages.at(-1);
+      if (body.tools && user.includes("round-limit")) {
+        emit({
+          message: {
+            role: "assistant",
+            content: "",
+            tool_calls: [
+              {
+                function: {
+                  name: "read_file",
+                  arguments: { path: "README.md" },
+                },
+              },
+            ],
+          },
+          done: true,
+        });
+        return res.end();
+      }
       if (
         body.tools &&
         user.includes("prose-recovery") &&

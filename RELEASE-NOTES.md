@@ -1,25 +1,19 @@
-# Ember 1.1.0
+# Ember 1.1.1
 
-Choose how Agent tasks handle approvals, with project defaults and per-task overrides.
+Agent turns can now run for up to **100 model-response rounds**, increased from 12. A round can contain multiple tool calls; execution-check retries also count. The settings help text and limit message use the same shared limit as the backend.
 
-- **Ask every time:** approve each file write and shell command. This remains the default for existing projects.
-- **Ask for risky or unknown:** automatically allow ordinary source/text edits and commands you explicitly trust by their full text. Scripts, configuration, executable/symlinked targets, unknown file types, and clearing nonempty files prompt for review. Unlisted commands always prompt.
-- **Always run:** execute agent writes and commands without per-action prompts. Shell commands run with your user permissions; they are not OS-sandboxed.
-
-Click **Approvals** below an Agent task’s message box. Set project defaults in **Project settings → Approval mode**. Task settings can inherit the project policy or override it.
-
-Automatic actions remain visible in history. Cancellation, timeouts, file-tool boundaries, and stale-write checks remain enabled. Settings cannot change during active work, and pending approvals are not retroactively approved.
+The repository is now **xorxand/ember**. History, tags, and existing releases are preserved. Repository links and Debian package metadata have been updated.
 
 ## Install
 
-Close Ember, then install the downloaded package:
+Close Ember and install the downloaded package:
 
 ```sh
-sudo apt install ./ember-local_1.1.0_amd64.deb
+sudo apt install ./ember-local_1.1.1_amd64.deb
 ```
 
-Reopen Ember. Existing conversations, models, and projects are retained. Existing projects keep Ask every time until you change their policy.
+Reopen Ember to use the new limit. Your conversations and approval policies are retained.
 
-The `ember-1.1.0.tar.gz` asset includes the built browser interface. Extract it, enter `localmodel`, and run `node server/index.mjs` using Node.js 24 or newer. GitHub automatic source archives need `npm ci && npm run build` first. Both downloadable assets have hashes in `SHA256SUMS`.
+Alternatively, extract `ember-1.1.1.tar.gz`, enter the `ember` folder, and run `node server/index.mjs` with Node.js 24 or newer. This release asset includes the built UI. GitHub automatic source archives need `npm ci && npm run build` first. Download checksums are in `SHA256SUMS`.
 
-See README.md for exact policy rules and VALIDATION.md for test evidence. System-wide Debian installation is not verified on this host.
+All 32 backend tests passed, including an agent that continued beyond 12 rounds and stopped at exactly 100. System-wide package installation remains unverified on this host.

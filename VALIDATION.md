@@ -60,3 +60,10 @@ Native Electron smoke also passed under Xvfb (virtual display), using the existi
 - Existing browser workflows (12 standard checks, scaling, and Agent setup) passed.
 - Inspected the approval dialog at 1440×1000. Shell execution retains user-level access; this feature does not add OS sandboxing.
 - Native Electron smoke passed under Xvfb with the existing test-only sandbox override. The Debian package’s version, shared policy module, launcher, and root-owned sandbox helper were verified; normal package installation remains untested on this host.
+
+## Version 1.1.1 — repository rename and 100-round limit
+
+- All 32 backend/unit/integration tests passed. A deterministic agent issued 100 successive tool-call responses and stopped at exactly the new limit, proving continuation beyond the previous 12-round cap.
+- Production UI build passed with the shared limit in the settings text. Backend and UI use the same constant.
+- GitHub repository renamed to `xorxand/ember`; all three existing release IDs were verified unchanged. Local repository moved to `/home/nixo/git/ember`, and the remote and repository links were updated.
+- All 12 standard browser workflows passed with no page errors. Debian metadata and the packaged shared constant were verified as version 1.1.1 and 100 rounds.

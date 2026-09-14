@@ -38,7 +38,7 @@ const controlDir = path.join(stage, "DEBIAN");
 await fs.mkdir(controlDir, { recursive: true });
 await fs.writeFile(
   path.join(controlDir, "control"),
-  `Package: ember-local\nVersion: ${version}\nSection: devel\nPriority: optional\nArchitecture: amd64\nMaintainer: xorxand <xorxand@users.noreply.github.com>\nHomepage: https://github.com/xorxand/localmodel\nDepends: git, ripgrep, libgtk-3-0, libnss3, libxss1, libgbm1, libasound2 | libasound2t64, libatk-bridge2.0-0, libdrm2, libxkbcommon0, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libxfixes3, libxext6\nDescription: Local AI workspace powered by Ollama\n Projects, tasks, model discovery and downloads, streaming chat, and coding tools.\n`,
+  `Package: ember-local\nVersion: ${version}\nSection: devel\nPriority: optional\nArchitecture: amd64\nMaintainer: xorxand <xorxand@users.noreply.github.com>\nHomepage: https://github.com/xorxand/ember\nDepends: git, ripgrep, libgtk-3-0, libnss3, libxss1, libgbm1, libasound2 | libasound2t64, libatk-bridge2.0-0, libdrm2, libxkbcommon0, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libxfixes3, libxext6\nDescription: Local AI workspace powered by Ollama\n Projects, tasks, model discovery and downloads, streaming chat, and coding tools.\n`,
 );
 await fs.chmod(path.join(appDir, "chrome-sandbox"), 0o4755);
 await fs.writeFile(

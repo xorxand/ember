@@ -15,11 +15,11 @@ node server/index.mjs
 
 Open **http://127.0.0.1:4317**. Set `PORT` to change the port. Stop with Ctrl+C. Project folders can be added by absolute path.
 
-Cloning the repository instead? Run `npm ci` and `npm run build` before starting the server. GitHub’s automatic source archives also need this build step.
+Cloning the repository instead? Use `git clone https://github.com/xorxand/ember.git`, enter the `ember` folder, and run `npm ci` and `npm run build` before starting the server. GitHub’s automatic source archives also need this build step.
 
 ### Linux desktop package
 
-Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/localmodel/releases/tag/1.1.0). Local builds place it in `release/ember-local_1.1.0_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.1.0). Local builds place it in `release/ember-local_1.1.0_amd64.deb`.
 
 ```bash
 sudo apt install ./release/ember-local_1.1.0_amd64.deb

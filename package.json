@@ -37,10 +37,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xorxand/localmodel.git"
+    "url": "git+https://github.com/xorxand/ember.git"
   },
-  "homepage": "https://github.com/xorxand/localmodel#readme",
+  "homepage": "https://github.com/xorxand/ember#readme",
   "bugs": {
-    "url": "https://github.com/xorxand/localmodel/issues"
+    "url": "https://github.com/xorxand/ember/issues"
   }
 }

@@ -11,6 +11,72 @@ import {
   effectiveApprovalPolicy,
 } from "../shared/approval-policy.js";
 marked.setOptions({ breaks: true, gfm: true });
+function MessageTiming({ message, running }) {
+  const timing = message.timing;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!running || !timing || timing.finishedAt) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [running, timing?.startedAt, timing?.finishedAt]);
+  const stamp = (value) => (
+    <time
+      dateTime={value}
+      title={new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "long",
+      }).format(new Date(value))}
+    >
+      {new Date(value).toLocaleTimeString()}
+    </time>
+  );
+  if (message.role === "user")
+    return message.createdAt ? (
+      <div className="message-timing">Sent {stamp(message.createdAt)}</div>
+    ) : null;
+  if (!timing) return null;
+  const ms = timing.finishedAt
+    ? timing.elapsedMs
+    : running
+      ? Math.max(0, now - Date.parse(timing.startedAt))
+      : null;
+  const seconds = ms === null ? null : Math.round(ms / 100) / 10;
+  const elapsed =
+    seconds === null
+      ? "Elapsed unavailable"
+      : seconds < 60
+        ? `${seconds.toFixed(1)}s elapsed`
+        : `${Math.floor(seconds / 60)}m ${(seconds % 60).toFixed(1)}s elapsed`;
+  return (
+    <div className="message-timing" aria-label="Response timing">
+      <span>Started {stamp(timing.startedAt)}</span>
+      {timing.firstResponseAt && (
+        <span
+          className="timing-first"
+          title="When the first response text or tool call arrived"
+        >
+          First response {stamp(timing.firstResponseAt)}
+        </span>
+      )}
+      {timing.finishedAt ? (
+        <span>
+          {timing.status === "stopped"
+            ? "Stopped"
+            : timing.status === "failed"
+              ? "Failed"
+              : "Response finished"}{" "}
+          {stamp(timing.finishedAt)}
+        </span>
+      ) : (
+        <span>{running ? "Responding…" : "Completion time unavailable"}</span>
+      )}
+      <span title="Time since your message was sent, including queue and approval waits.">
+        {elapsed}
+      </span>
+    </div>
+  );
+}
 function Markdown({ children }) {
   const html = useMemo(
     () =>
@@ -619,7 +685,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v1.1.1</span>
+            <span>v1.2.0</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -2475,7 +2541,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Version 1.1.1</Tag>
+            <Tag>Version 1.2.0</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -2738,6 +2804,10 @@ function TaskView({
                   ) : (
                     <Markdown>{m.content}</Markdown>
                   )}
+                  <MessageTiming
+                    message={m}
+                    running={active && index === visibleMessages.length - 1}
+                  />
                   {m.executionSummary && (
                     <div className="run-status" role="status">
                       {m.executionSummary.toolCalls === 0

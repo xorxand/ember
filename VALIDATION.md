@@ -67,3 +67,10 @@ Native Electron smoke also passed under Xvfb (virtual display), using the existi
 - Production UI build passed with the shared limit in the settings text. Backend and UI use the same constant.
 - GitHub repository renamed to `xorxand/ember`; all three existing release IDs were verified unchanged. Local repository moved to `/home/nixo/git/ember`, and the remote and repository links were updated.
 - All 12 standard browser workflows passed with no page errors. Debian metadata and the packaged shared constant were verified as version 1.1.1 and 100 rounds.
+
+## Version 1.2.0 — message timing (September 20, 2026)
+
+- All 34 backend/unit/integration tests passed. New tests verify send/first-response/completion ordering, queue time inclusion, exact elapsed calculation, SQLite persistence, and cancellation labeling.
+- Timing browser workflow passed: legacy replies do not receive fabricated timing, a live response timer is visible, timestamps match stored data in a non-UTC browser timezone, timing survives reload, and a stopped stream is labeled Stopped.
+- Inspected the timing row at 1440×1000. Times include seconds and full date/timezone tooltips; rows wrap on narrower layouts.
+- All 12 standard browser workflows passed without page errors. Production build and Debian packaging passed; package metadata confirms version 1.2.0 and the Ember repository homepage. System-wide installation was not performed.

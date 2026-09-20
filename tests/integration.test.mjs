@@ -520,3 +520,51 @@ test("Agent continues beyond 12 rounds and stops at the 100-round limit", async 
   assert.equal(stored.messages.filter((m) => m.role === "tool").length, 100);
   assert.match(stored.messages.at(-1).content, /100-round limit/);
 });
+
+test("response timing tracks send, first response, completion, queue time, and persists", async (t) => {
+  const { app, call } = await fixture(t);
+  const first = (await call("tasks", {})).data;
+  const second = (await call("tasks", {})).data;
+  await call("tasks/send", { id: first.id, content: "slow please" });
+  await call("tasks/send", { id: second.id, content: "hello" });
+  const queued = app.store.task(second.id);
+  const sentAt = queued.messages.at(-1).createdAt;
+  assert.equal(queued.status, "queued");
+  await until(() => queued.status === "complete");
+  const answer = queued.messages.at(-1);
+  assert.equal(answer.timing.startedAt, sentAt);
+  assert.equal(answer.timing.status, "completed");
+  assert.ok(
+    Date.parse(answer.createdAt) >=
+      Date.parse(app.store.task(first.id).messages.at(-1).timing.finishedAt),
+  );
+  assert.ok(Date.parse(answer.timing.firstResponseAt) >= Date.parse(sentAt));
+  assert.ok(
+    Date.parse(answer.timing.finishedAt) >=
+      Date.parse(answer.timing.firstResponseAt),
+  );
+  assert.equal(
+    answer.timing.elapsedMs,
+    Date.parse(answer.timing.finishedAt) - Date.parse(sentAt),
+  );
+  const persisted = JSON.parse(
+    app.store.db.prepare("SELECT data FROM messages WHERE id=?").get(answer.id)
+      .data,
+  );
+  assert.deepEqual(persisted.timing, answer.timing);
+});
+test("cancelled streamed response receives stopped timing rather than completion", async (t) => {
+  const { app, call } = await fixture(t);
+  const task = (await call("tasks", {})).data;
+  await call("tasks/send", { id: task.id, content: "slow please" });
+  const stored = app.store.task(task.id);
+  await until(() =>
+    stored.messages.some((m) => m.role === "assistant" && m.content),
+  );
+  await call("tasks/stop", { id: task.id });
+  await until(() => stored.status === "stopped");
+  const answer = stored.messages.at(-1);
+  assert.equal(answer.timing.status, "stopped");
+  assert.ok(answer.timing.finishedAt);
+  assert.ok(answer.timing.elapsedMs >= 0);
+});

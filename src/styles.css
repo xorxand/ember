@@ -3129,3 +3129,16 @@ button {
   line-height: 1.6;
   color: var(--muted);
 }
+
+.message-timing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.message-timing time {
+  white-space: nowrap;
+}

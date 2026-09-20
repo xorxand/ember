@@ -6,7 +6,7 @@ A Codex-inspired local AI workspace powered by Ollama. Projects and multiple tas
 
 ### Browser workspace — quickest start
 
-Requires **Node.js 24 or newer**. The `ember-1.1.1.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
+Requires **Node.js 24 or newer**. The `ember-1.2.0.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
 
 ```bash
 cd ember
@@ -19,10 +19,10 @@ Cloning the repository instead? Use `git clone https://github.com/xorxand/ember.
 
 ### Linux desktop package
 
-Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.1.1). Local builds place it in `release/ember-local_1.1.1_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.2.0). Local builds place it in `release/ember-local_1.2.0_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_1.1.1_amd64.deb
+sudo apt install ./release/ember-local_1.2.0_amd64.deb
 ember
 ```
 
@@ -51,6 +51,12 @@ npm run desktop
 ## Chat and Agent mode
 
 Use **Chat** for conversation. It cannot edit files or execute commands. Choose **Agent** in the composer (or **Enable Agent** below it) to do work. If the task has no project, select an existing project or add a local folder. Your messages and draft stay in the same task; send the next instruction to begin, since old requests are not replayed. Agent requires a model with tool support and uses the configured approval policy for writes and commands (Ask every time by default). It checks for unfinished work with at most two automatic follow-ups per turn. Final replies show actual tool activity; no-tool responses explicitly say that no files or commands were affected. Advertised tool support does not guarantee reliable execution. Commands can also create or modify files, so the separate file-approval count only covers direct file-tool changes.
+
+## Message timing
+
+Each new reply shows **Started**, **First response**, **Response finished**, and **elapsed time** beneath its text. Started is the time your message was sent, so elapsed time includes queueing, earlier agent rounds, and approval waits within that turn. The elapsed counter updates while the response is streaming. User messages also show their sent time.
+
+Times are displayed in your browser’s local timezone; hover over a timestamp for the full date and timezone. Timing is saved with the conversation. Cancelled and failed streams show Stopped or Failed instead of a successful completion label. Older replies and abruptly interrupted streams without recorded completion times do not receive invented timestamps.
 
 ## Approval policies
 
@@ -89,6 +95,7 @@ File tools enforce the real project root, including symlink checks; parent trave
 ```bash
 npm test               # backend/unit/integration suite using an isolated mock Ollama
 npm run test:ui        # existing Playwright workflows
+npm run test:timing-ui # live timestamps, completion, reload persistence, cancellation
 npm run test:approval-ui # approval modes, project defaults, overrides, audit and persistence
 npm run test:agent-setup-ui # chat-to-agent setup, preserved history/draft, approved writes
 npm run test:scaling-ui # history paging, repository search, worktree review/apply

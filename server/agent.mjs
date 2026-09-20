@@ -264,6 +264,20 @@ export class Agent {
   }
   async run(task, controller) {
     const signal = controller.signal;
+    const turnStartedAt =
+      task.messages.findLast((m) => m.role === "user")?.createdAt ||
+      new Date().toISOString();
+    let activeAnswer;
+    const finishTiming = (answer, status) => {
+      if (!answer?.timing || answer.timing.finishedAt) return;
+      answer.timing.finishedAt = new Date().toISOString();
+      answer.timing.elapsedMs = Math.max(
+        0,
+        Date.parse(answer.timing.finishedAt) -
+          Date.parse(answer.timing.startedAt),
+      );
+      answer.timing.status = status;
+    };
     task.status = "running";
     this.store.touch({ taskId: task.id });
     try {
@@ -303,8 +317,10 @@ export class Agent {
           role: "assistant",
           content: "",
           model: task.model,
+          timing: { startedAt: turnStartedAt },
           createdAt: new Date().toISOString(),
         };
+        activeAnswer = answer;
         task.messages.push(answer);
         this.store.touch({ taskId: task.id });
         const response = await this.ollama.request("/api/chat", {
@@ -331,6 +347,11 @@ export class Agent {
           lastPersist = 0;
         for await (const chunk of ndjson(response.body)) {
           if (chunk.error) throw new Error(chunk.error);
+          if (
+            !answer.timing.firstResponseAt &&
+            (chunk.message?.content || chunk.message?.tool_calls?.length)
+          )
+            answer.timing.firstResponseAt = new Date().toISOString();
           answer.content += chunk.message?.content || "";
           if (chunk.message?.tool_calls?.length) {
             answer.tool_calls ||= [];
@@ -338,6 +359,7 @@ export class Agent {
           }
           if (chunk.done) {
             done = true;
+            finishTiming(answer, "completed");
             answer.metrics = {
               tokens: chunk.eval_count,
               seconds: (chunk.total_duration || 0) / 1e9,
@@ -520,6 +542,7 @@ export class Agent {
       task.status = signal.aborted ? "stopped" : "failed";
       task.error = signal.aborted ? null : e.message;
     } finally {
+      finishTiming(activeAnswer, signal.aborted ? "stopped" : "failed");
       // Complete dangling tool calls after stop/error so the next turn has valid history.
       const lastAssistant = task.messages.findLast(
         (m) => m.role === "assistant",

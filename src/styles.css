@@ -1735,6 +1735,10 @@ button {
   gap: 4px;
   min-width: 0;
 }
+.composer-bottom .composer-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .composer-bottom select {
   border: none;
   background: none;

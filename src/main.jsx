@@ -745,7 +745,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v1.4.0</span>
+            <span>v1.4.1</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -2709,7 +2709,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Version 1.4.0</Tag>
+            <Tag>Version 1.4.1</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -3307,6 +3307,27 @@ function TaskView({
                 disabled={active}
                 onClick={() => fileRef.current.click()}
               />
+              <select
+                aria-label="Task mode"
+                value={task.mode}
+                disabled={active || task.archived || offline}
+                onChange={(e) => changeMode(e.target.value)}
+              >
+                <option value="chat">Chat</option>
+                <option value="agent">Agent</option>
+              </select>
+              <span className="composer-divider" />
+              <ModelSelect
+                state={state}
+                value={task.model}
+                agent={task.mode === "agent"}
+                disabled={active}
+                onChange={(model) =>
+                  act("tasks/update", { id: task.id, model })
+                }
+              />
+            </div>
+            <div className="composer-actions">
               <button
                 className={`icon-button dictation-button ${dictation.status === "recording" ? "recording" : ""}`}
                 type="button"
@@ -3337,52 +3358,33 @@ function TaskView({
                   <span>{`${Math.floor(dictation.seconds / 60)}:${String(dictation.seconds % 60).padStart(2, "0")}`}</span>
                 )}
               </button>
-              <select
-                aria-label="Task mode"
-                value={task.mode}
-                disabled={active || task.archived || offline}
-                onChange={(e) => changeMode(e.target.value)}
-              >
-                <option value="chat">Chat</option>
-                <option value="agent">Agent</option>
-              </select>
-              <span className="composer-divider" />
-              <ModelSelect
-                state={state}
-                value={task.model}
-                agent={task.mode === "agent"}
-                disabled={active}
-                onChange={(model) =>
-                  act("tasks/update", { id: task.id, model })
-                }
-              />
+              {active ? (
+                <button
+                  type="button"
+                  className="send-button stop-button"
+                  aria-label="Stop task"
+                  onClick={() => act("tasks/stop", { id: task.id })}
+                >
+                  <Icon name="stop" size={16} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="send-button"
+                  aria-label="Send message"
+                  disabled={
+                    !draft.trim() ||
+                    !task.model ||
+                    !state.ollama.connected ||
+                    sending ||
+                    task.archived ||
+                    offline
+                  }
+                >
+                  <Icon name="arrow" size={20} />
+                </button>
+              )}
             </div>
-            {active ? (
-              <button
-                type="button"
-                className="send-button stop-button"
-                aria-label="Stop task"
-                onClick={() => act("tasks/stop", { id: task.id })}
-              >
-                <Icon name="stop" size={16} />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="send-button"
-                aria-label="Send message"
-                disabled={
-                  !draft.trim() ||
-                  !task.model ||
-                  !state.ollama.connected ||
-                  sending ||
-                  task.archived ||
-                  offline
-                }
-              >
-                <Icon name="arrow" size={20} />
-              </button>
-            )}
           </div>
         </form>
         <div className="composer-footnote">

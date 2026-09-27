@@ -88,3 +88,8 @@ Native Electron smoke also passed under Xvfb (virtual display), using the existi
 - All 13 standard browser workflows and the native Electron shell smoke test passed.
 - The pinned `tiny.en` weights downloaded through Ember's speech manager, passed SHA-256 verification, and produced the expected JFK sample transcription using the bundled whisper.cpp 1.9.4 runtime.
 - The Debian package reports version 1.4.0 and includes the speech executable, CPU runtime libraries, license, and required system dependencies. The executable was run directly from an extracted package and completed a real transcription. System-wide installation was not performed.
+
+## Version 1.4.1 — composer placement (September 27, 2026)
+
+- The dictation browser workflow verifies that the microphone is immediately followed by the submit button in the right-side composer action group.
+- The full local record, transcription, cursor insertion, and review workflow still passes without browser errors; production build and visual inspection passed.

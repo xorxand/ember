@@ -1,4 +1,8 @@
-# Ember 1.4.0
+# Ember 1.4.1
+
+The dictation microphone now sits in the right-side composer action group, immediately to the left of the submit arrow. Its recording timer expands toward the message controls without shifting the attachment, mode, or model selectors.
+
+This patch includes all local dictation functionality introduced in 1.4.0:
 
 Ember now supports fully local voice dictation. Click the microphone beside the message field, speak, then stop recording. The transcript is inserted at the cursor for review before it is sent. Escape cancels recording, a visible timer shows when the microphone is active, and recordings are limited to five minutes.
 
@@ -9,7 +13,7 @@ Electron grants microphone access only to Ember's own loopback origin and contin
 Close Ember and install:
 
 ```sh
-sudo apt install ./ember-local_1.4.0_amd64.deb
+sudo apt install ./ember-local_1.4.1_amd64.deb
 ```
 
 Existing conversations, Ollama models, projects, settings, and approval policies are retained. Download a speech model after installing, then use the microphone in any task.

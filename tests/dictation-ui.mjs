@@ -93,6 +93,20 @@ try {
     "Before locally dictated text after",
   );
   await page.getByRole("button", { name: "Start dictation" }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Start dictation" })
+      .evaluate((button) => button.classList.contains("recording")),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Start dictation" })
+      .evaluate((button) =>
+        button.nextElementSibling?.getAttribute("aria-label"),
+      ),
+    "Send message",
+  );
   if (process.env.EMBER_DICTATION_SCREENSHOT) {
     await page.screenshot({
       path: process.env.EMBER_DICTATION_SCREENSHOT,

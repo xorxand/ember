@@ -6,7 +6,7 @@ A Codex-inspired local AI workspace powered by Ollama. Projects and multiple tas
 
 ### Browser workspace — quickest start
 
-Requires **Node.js 24 or newer**. The `ember-1.4.0.tar.gz` release asset includes a prebuilt interface and local speech runtime; the server uses only Node built-ins:
+Requires **Node.js 24 or newer**. The `ember-1.4.1.tar.gz` release asset includes a prebuilt interface and local speech runtime; the server uses only Node built-ins:
 
 ```bash
 cd ember
@@ -19,10 +19,10 @@ Cloning the repository instead? Use `git clone https://github.com/xorxand/ember.
 
 ### Linux desktop package
 
-Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.4.0). Local builds place it in `release/ember-local_1.4.0_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.4.1). Local builds place it in `release/ember-local_1.4.1_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_1.4.0_amd64.deb
+sudo apt install ./release/ember-local_1.4.1_amd64.deb
 ember
 ```
 

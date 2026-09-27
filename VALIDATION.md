@@ -74,3 +74,9 @@ Native Electron smoke also passed under Xvfb (virtual display), using the existi
 - Timing browser workflow passed: legacy replies do not receive fabricated timing, a live response timer is visible, timestamps match stored data in a non-UTC browser timezone, timing survives reload, and a stopped stream is labeled Stopped.
 - Inspected the timing row at 1440×1000. Times include seconds and full date/timezone tooltips; rows wrap on narrower layouts.
 - All 12 standard browser workflows passed without page errors. Production build and Debian packaging passed; package metadata confirms version 1.2.0 and the Ember repository homepage. System-wide installation was not performed.
+
+## Version 1.3.0 — tool reliability (September 27, 2026)
+
+- All 36 backend tests passed, including digest matching, changed-weight reset, alias handling, unknown capabilities, and Agent sorting without mutation.
+- All 13 browser checks passed with no browser errors, including reliability badges, Agent ranking, warning, and selecting both verified and unreliable models.
+- Production build passed. Initial ratings are bundled evidence, not automatic model certification.

@@ -3142,3 +3142,19 @@ button {
 .message-timing time {
   white-space: nowrap;
 }
+
+.model-reliability {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.model-reliability strong {
+  color: var(--text);
+}
+.reliability-unreliable,
+.reliability-chat {
+  border-left: 3px solid #d99b36;
+}

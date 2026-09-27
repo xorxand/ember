@@ -1,3 +1,7 @@
+import {
+  modelReliability,
+  sortAgentModels,
+} from "../shared/model-reliability.js";
 import { MAX_AGENT_ROUNDS } from "../shared/agent-limits.js";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
@@ -192,10 +196,12 @@ function ModelSelect({
   onChange,
   disabled,
   allowDefault = false,
+  agent = false,
 }) {
-  const models = state.ollama.models.filter(
+  let models = state.ollama.models.filter(
     (m) => !cloud(m) && !m.capabilities?.includes("embedding"),
   );
+  if (agent) models = sortAgentModels(models);
   return (
     <select
       aria-label="Model"
@@ -213,10 +219,26 @@ function ModelSelect({
       </option>
       {models.map((m) => (
         <option key={m.name} value={m.name}>
-          {m.name}
+          {m.name} · {modelReliability(m).label}
         </option>
       ))}
     </select>
+  );
+}
+function ModelReliabilityNotice({ state, model }) {
+  const selected = state.ollama.models.find(
+    (m) => m.name === (model || state.settings.defaultModel),
+  );
+  if (!selected) return null;
+  const info = modelReliability(selected);
+  return (
+    <div
+      className={`model-reliability reliability-${info.status}`}
+      role="status"
+    >
+      <strong>{info.label}</strong>
+      <span>{info.detail}</span>
+    </div>
   );
 }
 const policyInput = (mode, commands) =>
@@ -685,7 +707,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v1.2.0</span>
+            <span>v1.3.0</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -2541,7 +2563,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Version 1.2.0</Tag>
+            <Tag>Version 1.3.0</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -2928,6 +2950,9 @@ function TaskView({
           )}
         </div>
       )}
+      {task.mode === "agent" && (
+        <ModelReliabilityNotice state={state} model={task.model} />
+      )}
       <div className="composer-wrap">
         {task.archived && (
           <div className="notice-banner">
@@ -3018,6 +3043,7 @@ function TaskView({
               <ModelSelect
                 state={state}
                 value={task.model}
+                agent={task.mode === "agent"}
                 disabled={active}
                 onChange={(model) =>
                   act("tasks/update", { id: task.id, model })

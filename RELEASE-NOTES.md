@@ -1,24 +1,9 @@
-# Ember 1.2.0
+# Ember 1.3.0
 
-Chat and Agent replies now show message timing below the response:
+Model pickers now show Agent verified, Tool use unreliable, Chat only, or Untested. Agent mode ranks verified models first and explains the selected model's reliability without preventing selection.
 
-- **Started:** when your message was sent.
-- **First response:** when the first response text or tool call arrived.
-- **Response finished:** when the response completed.
-- **Elapsed:** time from sending your message to response completion, including queueing and approval waits. This updates live during generation.
+Initial assessments are tied to the exact tested weights: qwen3.5:4b passed basic tool checks; qwen2.5:1.5b repeatedly returned prose without executing tools. Updating a model resets its assessment to Untested unless that digest has evidence. Model size is not used to judge reliability. Verification does not guarantee success on every task. New models are not automatically tested.
 
-User messages also show their sent time. Timestamps use your local timezone; hover to see the full date and timezone. Timing persists with conversation history. Stopped and failed streams are labeled accurately, and historical completion times are never guessed.
+Close Ember and install `sudo apt install ./ember-local_1.3.0_amd64.deb`, then reopen it. Existing data is retained.
 
-## Install
-
-Close Ember, then install:
-
-```sh
-sudo apt install ./ember-local_1.2.0_amd64.deb
-```
-
-Reopen Ember. Existing conversations, models, and approval policies are retained. Detailed timing is recorded for new responses.
-
-The `ember-1.2.0.tar.gz` asset includes the built browser UI. Extract it, enter `ember`, and run `node server/index.mjs` using Node.js 24 or newer. GitHub automatic source archives require `npm ci && npm run build` first. Both assets have hashes in `SHA256SUMS`.
-
-All 34 backend tests, the timing browser workflow, and the standard browser workflows passed. System-wide installation is not verified on this host.
+The source archive includes the built UI and requires Node.js 24 or newer. Run `node server/index.mjs` from the extracted ember folder. Checksums are included in SHA256SUMS.

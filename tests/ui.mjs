@@ -101,6 +101,32 @@ try {
     .locator(".task-list-header")
     .getByRole("button", { name: "New task" })
     .click();
+  mock.models[0].digest =
+    "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b";
+  mock.models.push({
+    ...mock.models[0],
+    name: "verified:latest",
+    digest: "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd",
+  });
+  await app.ollama.refresh();
+  await page.locator(".reliability-unreliable").waitFor();
+  const choices = await page
+    .getByLabel("Model", { exact: true })
+    .locator("option")
+    .allTextContents();
+  assert.match(choices[1], /verified:latest.*Agent verified/);
+  assert.ok(choices.some((x) => x.includes("Tool use unreliable")));
+  await page
+    .getByLabel("Model", { exact: true })
+    .selectOption("verified:latest");
+  await page.locator(".reliability-verified").waitFor();
+  await page
+    .getByLabel("Model", { exact: true })
+    .selectOption("test-model:latest");
+  await page.locator(".reliability-unreliable").waitFor();
+  checks.push(
+    "Reliability badges, Agent ranking, warning, and unrestricted model selection",
+  );
   await page.getByLabel("Message", { exact: true }).fill("write a file");
   await page.getByRole("button", { name: "Send message" }).click();
   await page.getByRole("button", { name: "Inspect change" }).waitFor();

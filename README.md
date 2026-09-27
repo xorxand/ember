@@ -6,7 +6,7 @@ A Codex-inspired local AI workspace powered by Ollama. Projects and multiple tas
 
 ### Browser workspace — quickest start
 
-Requires **Node.js 24 or newer**. The `ember-1.3.0.tar.gz` release asset includes a prebuilt interface; the server uses only Node built-ins:
+Requires **Node.js 24 or newer**. The `ember-1.4.0.tar.gz` release asset includes a prebuilt interface and local speech runtime; the server uses only Node built-ins:
 
 ```bash
 cd ember
@@ -19,10 +19,10 @@ Cloning the repository instead? Use `git clone https://github.com/xorxand/ember.
 
 ### Linux desktop package
 
-Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.3.0). Local builds place it in `release/ember-local_1.3.0_amd64.deb`.
+Download the Debian/Ubuntu x64 package from [Releases](https://github.com/xorxand/ember/releases/tag/1.4.0). Local builds place it in `release/ember-local_1.4.0_amd64.deb`.
 
 ```bash
-sudo apt install ./release/ember-local_1.3.0_amd64.deb
+sudo apt install ./release/ember-local_1.4.0_amd64.deb
 ember
 ```
 
@@ -140,3 +140,11 @@ Technical references: [Ollama API](https://docs.ollama.com/api), [Ollama model l
 ## Model tool reliability
 
 Model selectors distinguish Agent verified, Tool use unreliable, Chat only, and Untested. Agent tasks show an explanation and list verified models first, while keeping every model selectable. These are tool-use assessments, not model-size ratings. The initial evidence marks the tested qwen3.5:4b weights as verified for basic tools and the tested qwen2.5:1.5b weights as unreliable. Evidence is keyed by the exact Ollama digest, so updated weights revert to Untested unless separately assessed. Missing capability metadata is treated as unknown. These initial assessments are bundled evidence; Ember does not automatically certify new models or infer failures from ordinary conversational replies.
+
+## Local dictation
+
+The microphone beside the message composer records on demand and transcribes entirely on the local computer. Stop recording to insert text at the current cursor position, review or edit it, and send normally. Press Escape while recording to cancel. Recordings are limited to five minutes and are deleted after transcription.
+
+Ember bundles the official Linux x64 `whisper.cpp` 1.9.4 runtime, but no speech weights. Open **Settings → Local dictation** to download a checksum-verified model: `tiny.en` (fast English), `base.en` (balanced English and the default), `small.en` (more accurate English), or multilingual `base`. Speech models are stored alongside workspace data and are separate from Ollama models. The browser workspace also supports dictation on localhost when the browser grants microphone permission.
+
+The bundled runtime is distributed under its included MIT license. Whisper model downloads come from the `ggerganov/whisper.cpp` repository on Hugging Face and are verified against pinned SHA-256 digests.

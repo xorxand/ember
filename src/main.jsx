@@ -8,13 +8,51 @@ import { createRoot } from "react-dom/client";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import Icon, { Logo } from "./icons";
-import { api, subscribe, bytes, cloud, busy, relativeTime } from "./api";
+import {
+  api,
+  apiAudio,
+  subscribe,
+  bytes,
+  cloud,
+  busy,
+  relativeTime,
+} from "./api";
 import "./styles.css";
 import {
   approvalModes,
   effectiveApprovalPolicy,
 } from "../shared/approval-policy.js";
 marked.setOptions({ breaks: true, gfm: true });
+function wavBlob(chunks, sampleRate) {
+  const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const buffer = new ArrayBuffer(44 + length * 2);
+  const view = new DataView(buffer);
+  const write = (offset, value) =>
+    [...value].forEach((character, index) =>
+      view.setUint8(offset + index, character.charCodeAt(0)),
+    );
+  write(0, "RIFF");
+  view.setUint32(4, 36 + length * 2, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  write(36, "data");
+  view.setUint32(40, length * 2, true);
+  let offset = 44;
+  for (const chunk of chunks)
+    for (const sample of chunk) {
+      const value = Math.max(-1, Math.min(1, sample));
+      view.setInt16(offset, value < 0 ? value * 32768 : value * 32767, true);
+      offset += 2;
+    }
+  return new Blob([buffer], { type: "audio/wav" });
+}
 function MessageTiming({ message, running }) {
   const timing = message.timing;
   const [now, setNow] = useState(Date.now());
@@ -707,7 +745,7 @@ function App() {
               <Icon name="sliders" size={16} />
               Settings
             </button>
-            <span>v1.3.0</span>
+            <span>v1.4.0</span>
             <IconButton
               icon={state.settings.theme === "dark" ? "sun" : "moon"}
               label="Toggle theme"
@@ -2417,6 +2455,10 @@ function Settings({ state, perform, act, setModal }) {
     [context, setContext] = useState(state.settings.contextLength),
     [temperature, setTemperature] = useState(state.settings.temperature),
     [concurrency, setConcurrency] = useState(state.settings.concurrency),
+    [speechModel, setSpeechModel] = useState(state.settings.speechModel),
+    [speechLanguage, setSpeechLanguage] = useState(
+      state.settings.speechLanguage,
+    ),
     [saving, setSaving] = useState(false);
   return (
     <div className="scroll-area settings-page">
@@ -2440,6 +2482,8 @@ function Settings({ state, perform, act, setModal }) {
                   contextLength: Number(context),
                   temperature: Number(temperature),
                   concurrency: Number(concurrency),
+                  speechModel,
+                  speechLanguage,
                 },
                 "Settings saved",
               );
@@ -2480,6 +2524,108 @@ function Settings({ state, perform, act, setModal }) {
                 Manage runtime
               </Button>
             </div>
+          </section>
+          <section className="settings-section">
+            <div>
+              <Icon name="microphone" size={20} />
+              <h2>Local dictation</h2>
+            </div>
+            <div className="form-columns">
+              <label className="form-label">
+                Speech model
+                <select
+                  aria-label="Speech model"
+                  value={speechModel}
+                  onChange={(e) => setSpeechModel(e.target.value)}
+                >
+                  {state.speech.models.map((model) => (
+                    <option key={model.name} value={model.name}>
+                      {model.label} · {bytes(model.size)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="form-label">
+                Language
+                <select
+                  aria-label="Dictation language"
+                  value={speechLanguage}
+                  disabled={speechModel.endsWith(".en")}
+                  onChange={(e) => setSpeechLanguage(e.target.value)}
+                >
+                  <option value="auto">Detect automatically</option>
+                  <option value="en">English</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="it">Italian</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="ja">Japanese</option>
+                  <option value="zh">Chinese</option>
+                </select>
+              </label>
+            </div>
+            <div className="speech-models">
+              {state.speech.models.map((model) => {
+                const downloading =
+                  state.speech.download?.name === model.name &&
+                  state.speech.download.status === "downloading";
+                return (
+                  <div key={model.name} className="speech-model-row">
+                    <span>
+                      <strong>{model.label}</strong>
+                      <small>
+                        {model.name} · {bytes(model.size)}
+                      </small>
+                    </span>
+                    {model.installed ? (
+                      <Button
+                        type="button"
+                        disabled={state.speech.busy}
+                        onClick={() =>
+                          act("speech/delete", { name: model.name })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    ) : downloading ? (
+                      <Button
+                        type="button"
+                        onClick={() => act("speech/download/cancel", {})}
+                      >
+                        Cancel{" "}
+                        {Math.floor(
+                          (state.speech.download.completed /
+                            state.speech.download.total) *
+                            100,
+                        )}
+                        %
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        disabled={
+                          state.speech.download?.status === "downloading"
+                        }
+                        onClick={() =>
+                          act("speech/download", { name: model.name })
+                        }
+                      >
+                        Download
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {state.speech.download?.status === "failed" && (
+              <p className="inline-error">{state.speech.download.error}</p>
+            )}
+            <p className="small muted">
+              Audio stays on this machine. Ember records only while the red
+              microphone is visible and inserts the transcript into the draft
+              for review. English-only models ignore the language setting.
+            </p>
           </section>
           <section className="settings-section">
             <div>
@@ -2563,7 +2709,7 @@ function Settings({ state, perform, act, setModal }) {
           <div>
             <Logo size={23} />
             <h2>Ember</h2>
-            <Tag>Version 1.3.0</Tag>
+            <Tag>Version 1.4.0</Tag>
           </div>
           <p>
             A local AI workspace built around open-weight models and Ollama.
@@ -2604,6 +2750,8 @@ function TaskView({
     [loadingOlder, setLoadingOlder] = useState(false);
   const [enablingAgent, setEnablingAgent] = useState(false);
   const [editingApprovals, setEditingApprovals] = useState(false);
+  const [dictation, setDictation] = useState({ status: "idle", seconds: 0 });
+  const dictationRef = useRef(null);
   const approvalPolicy = effectiveApprovalPolicy(task, project);
   const changeMode = (mode) => {
     if (mode === "agent" && !project) setEnablingAgent(true);
@@ -2626,6 +2774,130 @@ function TaskView({
     if (follow.current && messagesRef.current)
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
   }, [task.messages, task.status, task.approvals]);
+  useEffect(
+    () => () => {
+      const recording = dictationRef.current;
+      recording?.stream.getTracks().forEach((track) => track.stop());
+      recording?.processor.disconnect();
+      recording?.source.disconnect();
+      recording?.context.close();
+      clearInterval(recording?.timer);
+      dictationRef.current = null;
+    },
+    [task.id],
+  );
+  const startDictation = async () => {
+    const selected = state.speech.models.find(
+      (model) => model.name === state.settings.speechModel,
+    );
+    if (!state.speech.available) {
+      notify(
+        "This Ember build does not include the local speech engine.",
+        true,
+      );
+      return;
+    }
+    if (!selected?.installed) {
+      notify("Download the selected speech model in Settings first.", true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+        video: false,
+      });
+      const context = new AudioContext();
+      const source = context.createMediaStreamSource(stream);
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      const chunks = [];
+      processor.onaudioprocess = (event) =>
+        chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+      source.connect(processor);
+      processor.connect(context.destination);
+      const selection = {
+        start: inputRef.current?.selectionStart ?? draft.length,
+        end: inputRef.current?.selectionEnd ?? draft.length,
+      };
+      const started = Date.now();
+      const timer = setInterval(() => {
+        const seconds = Math.floor((Date.now() - started) / 1000);
+        setDictation({ status: "recording", seconds });
+        if (seconds >= 300) finishDictation();
+      }, 250);
+      dictationRef.current = {
+        stream,
+        context,
+        source,
+        processor,
+        chunks,
+        selection,
+        timer,
+      };
+      setDictation({ status: "recording", seconds: 0 });
+    } catch (error) {
+      notify(
+        error.name === "NotAllowedError"
+          ? "Microphone permission was denied. Allow microphone access for Ember and try again."
+          : error.message,
+        true,
+      );
+    }
+  };
+  const finishDictation = async (cancel = false) => {
+    const recording = dictationRef.current;
+    if (!recording) return;
+    dictationRef.current = null;
+    clearInterval(recording.timer);
+    recording.stream.getTracks().forEach((track) => track.stop());
+    recording.processor.disconnect();
+    recording.source.disconnect();
+    await recording.context.close();
+    if (cancel) {
+      setDictation({ status: "idle", seconds: 0 });
+      return;
+    }
+    if (!recording.chunks.length) {
+      setDictation({ status: "idle", seconds: 0 });
+      notify("No microphone audio was captured.", true);
+      return;
+    }
+    setDictation({ status: "transcribing", seconds: 0 });
+    try {
+      const result = await apiAudio(
+        "speech/transcribe",
+        wavBlob(recording.chunks, recording.context.sampleRate),
+      );
+      setDraft((current) => {
+        const start = Math.min(recording.selection.start, current.length);
+        const end = Math.min(recording.selection.end, current.length);
+        const before = current.slice(0, start);
+        const after = current.slice(end);
+        const left = before && !/\s$/.test(before) ? " " : "";
+        const right = after && !/^\s/.test(after) ? " " : "";
+        return `${before}${left}${result.text}${right}${after}`;
+      });
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch (error) {
+      notify(error.message, true);
+    } finally {
+      setDictation({ status: "idle", seconds: 0 });
+    }
+  };
+  useEffect(() => {
+    if (dictation.status !== "recording") return;
+    const cancel = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        finishDictation(true);
+      }
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, [dictation.status]);
   const send = async (e) => {
     e?.preventDefault();
     if (!draft.trim() || active || sending || offline) return;
@@ -2999,6 +3271,11 @@ function TaskView({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && dictation.status === "recording") {
+                e.preventDefault();
+                finishDictation(true);
+                return;
+              }
               if (
                 e.key === "Enter" &&
                 !e.shiftKey &&
@@ -3030,6 +3307,36 @@ function TaskView({
                 disabled={active}
                 onClick={() => fileRef.current.click()}
               />
+              <button
+                className={`icon-button dictation-button ${dictation.status === "recording" ? "recording" : ""}`}
+                type="button"
+                aria-label={
+                  dictation.status === "recording"
+                    ? "Stop dictation"
+                    : "Start dictation"
+                }
+                title={
+                  dictation.status === "recording"
+                    ? "Stop dictation"
+                    : "Dictate message"
+                }
+                disabled={
+                  active ||
+                  task.archived ||
+                  dictation.status === "transcribing" ||
+                  state.speech.busy
+                }
+                onClick={() =>
+                  dictation.status === "recording"
+                    ? finishDictation()
+                    : startDictation()
+                }
+              >
+                <Icon name="microphone" size={16} />
+                {dictation.status === "recording" && (
+                  <span>{`${Math.floor(dictation.seconds / 60)}:${String(dictation.seconds % 60).padStart(2, "0")}`}</span>
+                )}
+              </button>
               <select
                 aria-label="Task mode"
                 value={task.mode}
@@ -3096,6 +3403,15 @@ function TaskView({
               "Chat only · no file edits or commands"
             )}
           </span>
+          {dictation.status === "recording" && (
+            <span className="dictation-status">
+              Recording locally · click the microphone to transcribe · Esc to
+              cancel
+            </span>
+          )}
+          {dictation.status === "transcribing" && (
+            <span className="dictation-status">Transcribing locally…</span>
+          )}
           {task.mode === "chat" && (
             <button
               type="button"

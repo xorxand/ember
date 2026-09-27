@@ -1,9 +1,17 @@
-# Ember 1.3.0
+# Ember 1.4.0
 
-Model pickers now show Agent verified, Tool use unreliable, Chat only, or Untested. Agent mode ranks verified models first and explains the selected model's reliability without preventing selection.
+Ember now supports fully local voice dictation. Click the microphone beside the message field, speak, then stop recording. The transcript is inserted at the cursor for review before it is sent. Escape cancels recording, a visible timer shows when the microphone is active, and recordings are limited to five minutes.
 
-Initial assessments are tied to the exact tested weights: qwen3.5:4b passed basic tool checks; qwen2.5:1.5b repeatedly returned prose without executing tools. Updating a model resets its assessment to Untested unless that digest has evidence. Model size is not used to judge reliability. Verification does not guarantee success on every task. New models are not automatically tested.
+The Debian package and source archive include the official Linux x64 whisper.cpp 1.9.4 runtime. Speech weights are downloaded separately in **Settings → Local dictation**, with progress, cancellation, deletion, and SHA-256 verification. Available choices are fast English (`tiny.en`), balanced English (`base.en`, default), accurate English (`small.en`), and multilingual balanced (`base`). Audio and transcription stay on the computer and temporary recordings are deleted immediately afterward.
 
-Close Ember and install `sudo apt install ./ember-local_1.3.0_amd64.deb`, then reopen it. Existing data is retained.
+Electron grants microphone access only to Ember's own loopback origin and continues to deny camera access and untrusted origins. The browser workspace supports the same feature on localhost with browser permission.
 
-The source archive includes the built UI and requires Node.js 24 or newer. Run `node server/index.mjs` from the extracted ember folder. Checksums are included in SHA256SUMS.
+Close Ember and install:
+
+```sh
+sudo apt install ./ember-local_1.4.0_amd64.deb
+```
+
+Existing conversations, Ollama models, projects, settings, and approval policies are retained. Download a speech model after installing, then use the microphone in any task.
+
+Validation covers 37 backend tests, 13 standard browser workflows, a dedicated dictation browser workflow, the native Electron shell, and a real bundled whisper.cpp transcription using checksum-verified `tiny.en` weights. System-wide package installation was not performed on the build host.

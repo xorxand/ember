@@ -16,6 +16,8 @@ const defaults = () => ({
     concurrency: 1,
     theme: "dark",
     onboarded: false,
+    speechModel: "base.en",
+    speechLanguage: "auto",
   },
   projects: [],
   tasks: [],
@@ -104,6 +106,7 @@ export class Store extends EventEmitter {
         .all()
         .map((r) => this.wrapTask(JSON.parse(r.data)));
     }
+    this.data.settings = { ...defaults().settings, ...this.data.settings };
     for (const t of this.data.tasks)
       if (activeStatuses.includes(t.status)) {
         t.status = "interrupted";

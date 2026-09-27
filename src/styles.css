@@ -1764,6 +1764,57 @@ button {
 .stop-button {
   border-radius: 9px;
 }
+.dictation-button {
+  width: auto;
+  min-width: 30px;
+  gap: 5px;
+  padding: 0 7px;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.dictation-button.recording {
+  color: white;
+  background: #b84444;
+  animation: dictation-pulse 1.5s ease-in-out infinite;
+}
+.dictation-button.recording:hover {
+  color: white;
+  background: #9f3737;
+}
+.dictation-status {
+  color: var(--accent);
+}
+@keyframes dictation-pulse {
+  50% {
+    box-shadow: 0 0 0 4px #b8444428;
+  }
+}
+.speech-models {
+  display: grid;
+  gap: 7px;
+}
+.speech-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.speech-model-row > span {
+  display: grid;
+  gap: 3px;
+}
+.speech-model-row strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+.speech-model-row small {
+  color: var(--muted);
+  font-size: 9px;
+}
 .composer-footnote {
   display: flex;
   flex-wrap: wrap;

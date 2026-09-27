@@ -14,6 +14,7 @@ import { Agent } from "./agent.mjs";
 import { Installer } from "./installer.mjs";
 import { Workspaces } from "./workspaces.mjs";
 import { Search } from "./search.mjs";
+import { Speech } from "./speech.mjs";
 import { diffState } from "../shared/state-patches.js";
 import { rootPath, listFiles, readFile, runCommand } from "./projects.mjs";
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -22,6 +23,7 @@ export async function createApp({
   port = Number(process.env.PORT || 4317),
   endpoint,
   refresh = true,
+  speechBinary,
 } = {}) {
   const store = new Store(dataDir);
   if (endpoint) {
@@ -33,6 +35,7 @@ export async function createApp({
     downloads = new Downloads(store, ollama),
     workspaces = new Workspaces(store),
     search = new Search(),
+    speech = new Speech(store, { binary: speechBinary }),
     agent = new Agent(store, ollama, workspaces, search),
     installer = new Installer(store, ollama);
   const token = randomBytes(32).toString("hex");
@@ -64,6 +67,7 @@ export async function createApp({
         arch: process.arch,
       },
       installer: installer.status,
+      speech: speech.status,
       terminals,
     };
   };
@@ -114,6 +118,16 @@ export async function createApp({
     }
     return raw ? JSON.parse(raw) : {};
   };
+  const binaryBody = async (req, limit = 32_000_000) => {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > limit) throw new Error("Recording exceeds 32 MB.");
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  };
   const validToken = (value) =>
     typeof value === "string" &&
     Buffer.byteLength(value) === Buffer.byteLength(token) &&
@@ -133,7 +147,7 @@ export async function createApp({
     res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     );
     try {
       if (
@@ -269,6 +283,19 @@ export async function createApp({
           });
         if (req.method !== "POST")
           return json(res, { error: "Not found" }, 404);
+        if (route === "/api/speech/transcribe") {
+          if (req.headers["content-type"] !== "audio/wav")
+            throw new Error("Dictation requires WAV audio.");
+          const recording = await binaryBody(req);
+          return json(
+            res,
+            await speech.transcribe(
+              recording,
+              store.data.settings.speechModel,
+              store.data.settings.speechLanguage,
+            ),
+          );
+        }
         const data = await body(req);
         if (route === "/api/settings") {
           const s = { ...store.data.settings };
@@ -312,6 +339,22 @@ export async function createApp({
               throw new Error("Concurrency must be 1–4.");
             s.concurrency = n;
           }
+          if (data.speechModel !== undefined) {
+            if (
+              !speech.status.models.some(
+                (model) => model.name === data.speechModel,
+              )
+            )
+              throw new Error("Unknown speech model.");
+            s.speechModel = data.speechModel;
+          }
+          if (data.speechLanguage !== undefined) {
+            if (!/^(auto|[a-z]{2,3})$/.test(data.speechLanguage))
+              throw new Error(
+                "Use auto or a two-to-three letter language code.",
+              );
+            s.speechLanguage = data.speechLanguage;
+          }
           if (["light", "dark"].includes(data.theme)) s.theme = data.theme;
           if (typeof data.onboarded === "boolean") s.onboarded = data.onboarded;
           if (s.endpoint !== store.data.settings.endpoint)
@@ -324,6 +367,16 @@ export async function createApp({
         }
         if (route === "/api/ollama/reconnect")
           return json(res, await ollama.refresh());
+        if (route === "/api/speech/download") {
+          speech.downloadPromise = speech.download(data.name).catch(() => {});
+          return json(res, speech.status);
+        }
+        if (route === "/api/speech/download/cancel") {
+          speech.cancel();
+          return json(res, { ok: true });
+        }
+        if (route === "/api/speech/delete")
+          return json(res, await speech.remove(data.name));
         if (route === "/api/ollama/start")
           return json(res, await ollama.start());
         if (route === "/api/ollama/install")
@@ -685,6 +738,7 @@ export async function createApp({
     agent,
     workspaces,
     search,
+    speech,
     server,
     snapshot,
     async close() {
@@ -694,6 +748,7 @@ export async function createApp({
       agent.close();
       downloads.close();
       installer.cancel();
+      await speech.close();
       for (const c of terminalControllers.values()) c.abort();
       for (const client of clients) client.res.end();
       ollama.stopOwned();

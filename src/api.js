@@ -13,6 +13,16 @@ export async function api(route, data) {
   if (!res.ok) throw new Error(value.error || "Request failed");
   return value;
 }
+export async function apiAudio(route, blob) {
+  const res = await fetch(`/api/${route}`, {
+    method: "POST",
+    headers: { "x-ember-token": token, "Content-Type": "audio/wav" },
+    body: blob,
+  });
+  const value = await res.json();
+  if (!res.ok) throw new Error(value.error || "Transcription failed");
+  return value;
+}
 export async function subscribe(onState, signal, options = {}) {
   let state = null;
   const params = new URLSearchParams(options);

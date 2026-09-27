@@ -80,3 +80,11 @@ Native Electron smoke also passed under Xvfb (virtual display), using the existi
 - All 36 backend tests passed, including digest matching, changed-weight reset, alias handling, unknown capabilities, and Agent sorting without mutation.
 - All 13 browser checks passed with no browser errors, including reliability badges, Agent ranking, warning, and selecting both verified and unreliable models.
 - Production build passed. Initial ratings are bundled evidence, not automatic model certification.
+
+## Version 1.4.0 — local dictation (September 27, 2026)
+
+- All 37 backend/unit/integration tests passed, including speech-model allowlisting, missing-model handling, local transcription, cleanup, and deletion.
+- The dedicated dictation browser workflow passed microphone capture, WAV upload, local transcription, cursor-position insertion, and review before send without browser errors.
+- All 13 standard browser workflows and the native Electron shell smoke test passed.
+- The pinned `tiny.en` weights downloaded through Ember's speech manager, passed SHA-256 verification, and produced the expected JFK sample transcription using the bundled whisper.cpp 1.9.4 runtime.
+- The Debian package reports version 1.4.0 and includes the speech executable, CPU runtime libraries, license, and required system dependencies. The executable was run directly from an extracted package and completed a real transcription. System-wide installation was not performed.

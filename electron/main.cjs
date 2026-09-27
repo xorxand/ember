@@ -58,8 +58,39 @@ app
     mainWindow.webContents.on("will-navigate", (event, url) => {
       if (new URL(url).origin !== backend.url) event.preventDefault();
     });
+    const trustedMediaRequest = (
+      webContents,
+      permission,
+      details,
+      requireAudioType,
+    ) => {
+      try {
+        const origin = new URL(details.requestingUrl || webContents.getURL())
+          .origin;
+        const types =
+          details.mediaTypes || (details.mediaType ? [details.mediaType] : []);
+        return (
+          origin === backend.url &&
+          permission === "media" &&
+          (!requireAudioType || types.includes("audio")) &&
+          !types.includes("video")
+        );
+      } catch {
+        return false;
+      }
+    };
+    mainWindow.webContents.session.setPermissionCheckHandler(
+      (webContents, permission, requestingOrigin, details) =>
+        trustedMediaRequest(
+          webContents,
+          permission,
+          { ...details, requestingUrl: requestingOrigin },
+          false,
+        ),
+    );
     mainWindow.webContents.session.setPermissionRequestHandler(
-      (_webContents, _permission, callback) => callback(false),
+      (webContents, permission, callback, details) =>
+        callback(trustedMediaRequest(webContents, permission, details, true)),
     );
     ipcMain.handle("choose-folder", async (event) => {
       if (
